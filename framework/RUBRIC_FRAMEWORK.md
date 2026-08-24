@@ -50,21 +50,30 @@ being extended, autonomously, and cheaply?" Exact per-rung numbers live in each
 scenario; the trend:
 
 ```
-Axis   L0   L1   L2   L3   L4   L5   L6   L7
-COR    70   55   45   35   30   28   22   15
-ROB    15   25   20   18   15   15   12   10
-EFF     5    5   12   12   14   14   15   20
-AUT     5    5   10   10   12   13   15   20
-QUA     5   10   13   12   13   12   12   12
-REG     -    -    -    5    8   10   12   18
-FID     -    -    -    8    8    8   12    5
-TOTAL 100  100  100  100  100  100  100  100
+Axis   L0   L1   L2   L3   L4   L5   L6   L7   L8
+COR    70   55   45   35   30   28   22   15   20
+ROB    15   25   20   18   15   15   12   10   18
+EFF     5    5   12   12   14   14   15   20   12
+AUT     5    5   10   10   12   13   15   20   12
+QUA     5   10   13   12   13   12   12   12   13
+REG     -    -    -    5    8   10   12   18   10
+FID     -    -    -    8    8    8   12    5   15
+TOTAL 100  100  100  100  100  100  100  100  100
 ```
 
 (REG is meaningful only once there is prior behavior to protect — from L3's
 multi-run acceptance, growing to dominate at L7. FID appears once there is a
 product/design surface. FID's weight dips at L7 because the sprint backlog, not
 a static design, carries acceptance — regression and autonomy dominate there.)
+
+**L8 extends the trajectory rather than continuing it.** L8 is a hand-curated
+capstone (see `scenarios/L8-markdown-editor`) that breaks the L7 shape: a native
+desktop shell (Tauri), remote/secure I/O over SSH, and a hard cold-boot budget.
+`ROB` rises to 18 because robustness there **includes the security surface**
+(host-key verification, secret handling, sanitization); `FID` reaches its ladder
+**maximum of 15** because the WYSIWYM editing experience and perceived
+performance *are* the product; `REG` eases to 10 (a single ambitious build, not a
+five-sprint sequence).
 
 ## 4. The hard gate
 

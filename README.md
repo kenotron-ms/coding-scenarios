@@ -2,7 +2,8 @@
 
 A set of increasing-complexity coding challenges used as an **eval / harness** to
 prove out strategies for converging AI coding agents on **working code** — from a
-single pure function up to a medium-sized app delivered across agile sprints.
+single pure function up to a medium-sized app delivered across agile sprints,
+and a native Tauri desktop editor that reaches remote Markdown vaults over SSH.
 
 The unit under test is the **strategy + harness**, not any one piece of code.
 Each scenario defines full requirements, a verification method, and a scoring
@@ -24,6 +25,7 @@ rubric so two strategies can be compared on the same ladder.
 | [L5](scenarios/L5-url-shortener/REQUIREMENTS.md) | URL shortener | Service: HTTP + persistence + concurrency | ≥95% | 68 |
 | [L6](scenarios/L6-kanban-app/REQUIREMENTS.md) | Kanban app | Full app: data + rules + UI + E2E | 100% P0, ≥90% | 68 |
 | [L7](scenarios/L7-kanban-sprints/REQUIREMENTS.md) | Kanban sprints | Iterative multi-sprint + regression | per-sprint | 68 |
+| [L8](scenarios/L8-markdown-editor/REQUIREMENTS.md) | Markdown vault editor | Native desktop (Tauri) + SSH + security + WYSIWYM | P0 + perf + security, ≥90% | 66 |
 
 L6 and L7 **share the same application**: L6 builds it once, L7 re-delivers it as
 five scripted sprints. This keeps the top of the ladder comparable across

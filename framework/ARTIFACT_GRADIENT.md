@@ -11,29 +11,32 @@ per-sprint acceptance. This document is the authoritative matrix; each scenario'
 
 Legend: **R** = Required deliverable · **O** = Optional/Stretch · **—** = N/A for this rung.
 
-| Activity | L0 | L1 | L2 | L3 | L4 | L5 | L6 | L7 |
-|----------|----|----|----|----|----|----|----|----|
-| **User research** |||||||||
-| Stakeholder/user interviews | — | — | — | O | O | O | R | R |
-| Jobs-to-be-done / needs analysis | — | — | — | O | O | R | R | R |
-| Personas | — | — | — | — | — | O | R | R |
-| Usability testing | — | — | — | — | — | — | O | R |
-| **Product** |||||||||
-| Spec / acceptance criteria | R | R | R | R | R | R | R | R |
-| PRD (problem, scope, success metrics) | — | — | — | O | R | R | R | R |
-| User stories | — | — | — | R | R | R | R | R |
-| Prioritized backlog | — | — | — | — | O | O | R | R |
-| Sprint plans + goals | — | — | — | — | — | — | — | R |
-| Definition of Done | R | R | R | R | R | R | R | R |
-| Retrospective artifacts | — | — | — | — | — | — | — | R |
-| **Interaction / visual design** |||||||||
-| Interface/API contract design | — | — | R | R | R | R | R | R |
-| CLI UX / output format design | — | — | — | R | — | — | — | — |
-| Wireframes (lo-fi) | — | — | — | — | — | O | R | R |
-| Hi-fi mockups | — | — | — | — | — | — | R | R |
-| Design tokens / system | — | — | — | — | — | — | R | R |
-| Interaction/state specs | — | — | — | — | — | O | R | R |
-| Accessibility annotations (WCAG) | — | — | — | — | — | — | R | R |
+| Activity | L0 | L1 | L2 | L3 | L4 | L5 | L6 | L7 | L8 |
+|----------|----|----|----|----|----|----|----|----|----|
+| **User research** ||||||||||
+| Stakeholder/user interviews | — | — | — | O | O | O | R | R | R |
+| Jobs-to-be-done / needs analysis | — | — | — | O | O | R | R | R | R |
+| Personas | — | — | — | — | — | O | R | R | R |
+| Usability testing | — | — | — | — | — | — | O | R | R |
+| **Product** ||||||||||
+| Spec / acceptance criteria | R | R | R | R | R | R | R | R | R |
+| PRD (problem, scope, success metrics) | — | — | — | O | R | R | R | R | R |
+| User stories | — | — | — | R | R | R | R | R | R |
+| Prioritized backlog | — | — | — | — | O | O | R | R | R |
+| Sprint plans + goals | — | — | — | — | — | — | — | R | — |
+| Definition of Done | R | R | R | R | R | R | R | R | R |
+| Retrospective artifacts | — | — | — | — | — | — | — | R | — |
+| **Interaction / visual design** ||||||||||
+| Interface/API contract design | — | — | R | R | R | R | R | R | R |
+| CLI UX / output format design | — | — | — | R | — | — | — | — | — |
+| Wireframes (lo-fi) | — | — | — | — | — | O | R | R | R |
+| Hi-fi mockups | — | — | — | — | — | — | R | R | R |
+| Design tokens / system | — | — | — | — | — | — | R | R | R |
+| Interaction/state specs | — | — | — | — | — | O | R | R | R |
+| Accessibility annotations (WCAG) | — | — | — | — | — | — | R | R | R |
+| **Security & performance** ||||||||||
+| Threat model / security design | — | — | — | — | — | O | O | O | R |
+| Performance budget spec | — | — | — | — | — | O | O | O | R |
 
 ## 2. Why the gradient is shaped this way
 

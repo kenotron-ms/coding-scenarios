@@ -17,7 +17,7 @@ A useful eval must let us answer, for a given strategy:
   multi-sprint application that needs iterative feature delivery?
 
 To answer those, we define a **ladder of scenarios** of increasing complexity
-(L0 → L7), each with fully specified requirements, a verification method, and a
+(L0 → L8), each with fully specified requirements, a verification method, and a
 scoring rubric. Two strategies run against the same ladder produce comparable
 scores. That comparability is the entire point.
 
@@ -55,6 +55,7 @@ L4     template-engine             Multi-module library. Component composition +
 L5     url-shortener               Stateful service: HTTP + persistence + concurrency.
 L6     kanban-app                  Full app: data model + business rules + UI + E2E.
 L7     kanban-sprints              Iterative multi-sprint delivery. Cumulative regression.
+L8     markdown-editor             Native desktop (Tauri) + remote SSH I/O + security + WYSIWYM.
 ```
 
 L6 and L7 deliberately **share the same application** (a Kanban board). L6 is the
@@ -63,6 +64,15 @@ sequence of agile sprints, so we can measure iterative feature delivery and
 regression safety on a system the strategy has already had to reason about. This
 keeps the top of the ladder comparable across strategies: the app is fixed, only
 the delivery process changes.
+
+**L8 is a hand-curated capstone that sits above the graded ladder.** Where L0–L7
+are systematically graded, L8 is a bespoke top rung — a native **Tauri** desktop
+Markdown editor that reaches "vaults" over **SSH** — chosen because it stacks
+several new classes of difficulty the web-app rungs never touch: a native shell,
+remote and security-sensitive I/O, OS-config integration (`~/.ssh/config`,
+Tailscale), a hard cold-boot performance budget, and a WYSIWYM editing
+experience. Its rubric and thresholds *extend* the trajectory rather than
+continuing it (see `framework/RUBRIC_FRAMEWORK.md §3`).
 
 ## 4. The artifact gradient (the pedagogical spine)
 
@@ -82,6 +92,8 @@ L5     Medium (API consumers)    API + data model design PRD-lite + OpenAPI
 L6     Full (personas, JTBD)     Wireframes → hi-fi + DS  PRD + user stories + a11y
 L7     Full + continuous         Design evolves per      Backlog + sprint plans +
        (per-sprint feedback)     sprint                  DoD + retros
+L8     Full (+ usability test)   Full + perf/motion +    PRD + backlog + threat
+       (hand-curated capstone)   security/threat model   model + perf budget
 ```
 
 Each scenario document defines exactly which of these activities are **required
@@ -122,7 +134,7 @@ scenarios/L2-lru-cache/
 
 `REQUIREMENTS.md` is the canonical human-facing definition. Everything else is
 derived from it. The shared shape of that document is fixed by
-`framework/REQUIREMENTS_TEMPLATE.md` so all eight scenarios read the same way.
+`framework/REQUIREMENTS_TEMPLATE.md` so all nine scenarios read the same way.
 
 ## 7. Scoring model (summary)
 
@@ -156,6 +168,8 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
 - Scenarios are not meant to be novel/unseen research problems; they are
   well-understood tasks chosen so that "working" is unambiguous and cheaply
   verifiable.
+- L8 is a hand-curated native-desktop capstone that adds OS/remote/security
+  surface (Tauri + SSH) beyond the systematically-graded L0–L7 ladder.
 - L6/L7 are "medium" apps by design — large enough to require iteration, small
   enough to verify end-to-end in a bounded run.
 
@@ -170,4 +184,4 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
 | `framework/VERIFICATION_CONTRACT.md` | Test tiers, visibility, entrypoint contract |
 | `framework/CONVERGENCE_METRICS.md` | Telemetry definitions + capture |
 | `framework/ARTIFACT_GRADIENT.md` | Which research/design/product artifacts apply per level |
-| `scenarios/L0..L7/REQUIREMENTS.md` | The eight scenario definitions |
+| `scenarios/L0..L8/REQUIREMENTS.md` | The nine scenario definitions |

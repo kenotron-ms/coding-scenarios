@@ -1,7 +1,7 @@
 # Canonical Requirements Template
 
 Every `scenarios/L*/REQUIREMENTS.md` MUST follow this structure and section order.
-This keeps all eight scenarios readable in the same shape and makes them
+This keeps all nine scenarios readable in the same shape and makes them
 mechanically comparable. Sections that do not apply to a rung are kept but
 marked `N/A — <reason>` (honest omission, never silent).
 
