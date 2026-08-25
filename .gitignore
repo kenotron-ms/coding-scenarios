@@ -63,3 +63,7 @@ telemetry.json
 .pytest_cache/
 .hypothesis/
 !scenarios/**/reference/**        # keep reference solutions
+
+# goal-batch run markers (lane signals, not artifacts)
+DONE.json
+.amplifier/goals/manifest.tsv
