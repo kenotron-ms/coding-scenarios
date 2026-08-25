@@ -1,0 +1,24 @@
+level: 4
+scenario: L4-template-engine
+language: python
+workspace: solution/            # only agent-visible path; harness sets SOLUTION_DIR
+entrypoint:
+  kind: python-module
+  target: template_engine        # importable package name inside the solution dir
+build:
+  setup: []                      # stdlib only
+verify:
+  smoke: "pytest tests/smoke -q"
+  acceptance: "pytest tests/acceptance -q"
+  adversarial: "pytest tests/adversarial -q"
+budgets:                         # GRADING.md §9 (L4 row)
+  wall_clock_s: 3600
+  iterations_soft: 14
+  iterations_hard: 35
+  token_budget: 350000
+  interventions: 0
+regression:
+  strategy: per-group-diff       # GRADING.md §5 (L4): prior groups stay green as features land
+gate: "acceptance_pass >= 0.95"  # GRADING.md §4 (L3–L4); REQUIREMENTS §6.2/§7.3
+static_floor:
+  python: [ruff, pyright]
