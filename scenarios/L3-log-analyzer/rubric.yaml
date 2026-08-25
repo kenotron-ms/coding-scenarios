@@ -1,0 +1,86 @@
+scenario: L3-log-analyzer
+weights: {COR: 35, ROB: 18, EFF: 12, AUT: 10, QUA: 12, REG: 5, FID: 8}  # sum 100 (REQUIREMENTS §7.1)
+pass_threshold: 72                                        # REQUIREMENTS §7.4
+gate: "acceptance_pass >= 0.95"                           # GRADING.md §4; REQUIREMENTS §7.3
+denominators:                                             # explicit; equal to real test counts
+  acceptance: 36
+  adversarial: 22
+static_floor:
+  python: [ruff, pyright]                                # QUA hard floor (ruff optional on host)
+judge:
+  QUA: {agent: grader, rubric: "framework/GRADING.md#6 (QUA template)"}
+  FID: {agent: grader, rubric: "framework/GRADING.md#6 (FID template)", inputs: [design/]}
+# Check registry (GRADING.md §1). Each id maps 1:1 to a test function.
+checks:
+  # -- acceptance (denominator = 36) --------------------------------------
+  # AC-1 input sources (FR-1, FR-2)
+  - {id: L3-AC01, criterion: AC-1, traces: [FR-1, FR-2], tier: acceptance, axis: [COR], weight: 1, test: test_ac01_input_sources_equivalent_text}
+  - {id: L3-AC02, criterion: AC-1, traces: [FR-1, FR-9], tier: acceptance, axis: [COR], weight: 1, test: test_ac01b_input_sources_equivalent_json}
+  # AC-2 malformed & degenerate (FR-3, FR-13, NFR-2)
+  - {id: L3-AC03, criterion: AC-2, traces: [FR-3, FR-12],  tier: acceptance, axis: [COR, ROB], weight: 1, test: test_ac02_mixed_malformed_counted_on_stderr}
+  - {id: L3-AC04, criterion: AC-2, traces: [FR-3, FR-13],  tier: acceptance, axis: [ROB], weight: 1, test: test_ac02b_all_malformed_zero_report}
+  - {id: L3-AC05, criterion: AC-2, traces: [FR-13],        tier: acceptance, axis: [ROB], weight: 1, test: test_ac02c_empty_input_zero_report}
+  - {id: L3-AC06, criterion: AC-2, traces: [FR-3, FR-13],  tier: acceptance, axis: [ROB], weight: 1, test: test_ac02d_blank_only_input_not_malformed}
+  - {id: L3-AC07, criterion: AC-2, traces: [FR-12],        tier: acceptance, axis: [COR], weight: 1, test: test_ac02e_stderr_clean_when_no_malformed}
+  # AC-3 top-N (FR-4, FR-8)
+  - {id: L3-AC08, criterion: AC-3, traces: [FR-4],        tier: acceptance, axis: [COR], weight: 1, test: test_ac03_top_default_10}
+  - {id: L3-AC09, criterion: AC-3, traces: [FR-4],        tier: acceptance, axis: [COR], weight: 1, test: test_ac03b_top_1}
+  - {id: L3-AC10, criterion: AC-3, traces: [FR-4],        tier: acceptance, axis: [COR], weight: 1, test: test_ac03c_top_3}
+  - {id: L3-AC11, criterion: AC-3, traces: [FR-4],        tier: acceptance, axis: [COR], weight: 1, test: test_ac03d_top_more_than_distinct}
+  - {id: L3-AC12, criterion: AC-3, traces: [FR-8],        tier: acceptance, axis: [COR], weight: 1, test: test_ac03e_tiebreak_ascending_codepoint}
+  # AC-4 status & error rate (FR-5, FR-6)
+  - {id: L3-AC13, criterion: AC-4, traces: [FR-5],        tier: acceptance, axis: [COR], weight: 1, test: test_ac04_status_counts_and_classes}
+  - {id: L3-AC14, criterion: AC-4, traces: [FR-5],        tier: acceptance, axis: [COR, FID], weight: 1, test: test_ac04b_status_flag_controls_text_only}
+  - {id: L3-AC15, criterion: AC-4, traces: [FR-6],        tier: acceptance, axis: [COR], weight: 1, test: test_ac04c_error_rate_matches_oracle}
+  - {id: L3-AC16, criterion: AC-4, traces: [FR-6],        tier: acceptance, axis: [ROB], weight: 1, test: test_ac04d_error_rate_zero_denominator}
+  # AC-5 time-window (FR-7)
+  - {id: L3-AC17, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [COR], weight: 1, test: test_ac05_since_only}
+  - {id: L3-AC18, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [COR], weight: 1, test: test_ac05b_until_only}
+  - {id: L3-AC19, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [COR], weight: 1, test: test_ac05c_both_inclusive_boundaries}
+  - {id: L3-AC20, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [ROB], weight: 1, test: test_ac05d_inverted_window_zero_entries}
+  - {id: L3-AC21, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [COR], weight: 1, test: test_ac05e_offset_bearing_absolute_instant}
+  - {id: L3-AC22, criterion: AC-5, traces: [FR-7],        tier: acceptance, axis: [COR], weight: 1, test: test_ac05f_naive_since_is_utc}
+  # AC-6 JSON schema (FR-9, §2.1)
+  - {id: L3-AC23, criterion: AC-6, traces: [FR-9],        tier: acceptance, axis: [COR, FID], weight: 1, test: test_ac06_json_matches_pinned_fields}
+  - {id: L3-AC24, criterion: AC-6, traces: [FR-9],        tier: acceptance, axis: [COR, FID], weight: 1, test: test_ac06b_json_key_order_exact}
+  - {id: L3-AC25, criterion: AC-6, traces: [FR-9],        tier: acceptance, axis: [FID], weight: 1, test: test_ac06c_json_validates_declared_schema}
+  # AC-7 exit codes & stream purity (FR-10, FR-12)
+  - {id: L3-AC26, criterion: AC-7, traces: [FR-10],       tier: acceptance, axis: [COR, ROB], weight: 1, test: test_ac07_exit_codes}
+  - {id: L3-AC27, criterion: AC-7, traces: [FR-12],       tier: acceptance, axis: [COR], weight: 1, test: test_ac07b_stdout_purity_json_pipeable}
+  - {id: L3-AC28, criterion: AC-7, traces: [FR-12],       tier: acceptance, axis: [COR], weight: 1, test: test_ac07c_stdout_purity_text}
+  # AC-8 help & version (FR-11, NFR-6)
+  - {id: L3-AC29, criterion: AC-8, traces: [FR-11],       tier: acceptance, axis: [FID], weight: 1, test: test_ac08_help_contains_exit_table_and_resolutions}
+  - {id: L3-AC30, criterion: AC-8, traces: [FR-11],       tier: acceptance, axis: [FID], weight: 1, test: test_ac08b_version_exit0}
+  # AC-9 bounded memory (NFR-1)
+  - {id: L3-AC31, criterion: AC-9, traces: [NFR-1],       tier: acceptance, axis: [EFF], weight: 1, test: test_ac09_bounded_memory_streaming}
+  # AC-10 determinism (FR-8)
+  - {id: L3-AC32, criterion: AC-10, traces: [FR-8],       tier: acceptance, axis: [REG], weight: 1, test: test_ac10_determinism_json_hashseed}
+  - {id: L3-AC33, criterion: AC-10, traces: [FR-8],       tier: acceptance, axis: [REG], weight: 1, test: test_ac10b_determinism_text_tieheavy_hashseed}
+  # AC-11 design artifacts & self-golden (NFR-4, §5.4)
+  - {id: L3-AC34, criterion: AC-11, traces: [NFR-4],      tier: acceptance, axis: [FID], weight: 1, test: test_ac11_design_artifacts_present}
+  - {id: L3-AC35, criterion: AC-11, traces: [NFR-4],      tier: acceptance, axis: [FID], weight: 1, test: test_ac11b_text_matches_cli_ux_sample}
+  - {id: L3-AC36, criterion: AC-11, traces: [NFR-4],      tier: acceptance, axis: [FID], weight: 1, test: test_ac11c_user_stories_traceability}
+
+  # -- adversarial (denominator = 22; feeds COR/ROB, never the gate) ------
+  - {id: L3-ADV01, traces: [FR-13],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv01_empty_input}
+  - {id: L3-ADV02, traces: [FR-3],        tier: adversarial, axis: [ROB], weight: 1, test: test_adv02_all_malformed_input}
+  - {id: L3-ADV03, traces: [FR-4],        tier: adversarial, axis: [COR], weight: 1, test: test_adv03_top_zero_is_none}
+  - {id: L3-ADV04, traces: [FR-4, FR-10], tier: adversarial, axis: [ROB], weight: 1, test: test_adv04_top_negative_is_usage_error}
+  - {id: L3-ADV05, traces: [FR-10],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv05_unknown_flag_is_usage_error}
+  - {id: L3-ADV06, traces: [FR-9, FR-10], tier: adversarial, axis: [ROB], weight: 1, test: test_adv06_format_xml_is_usage_error}
+  - {id: L3-ADV07, traces: [FR-10],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv07_missing_file_is_runtime_error}
+  - {id: L3-ADV08, traces: [FR-10],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv08_directory_as_file_is_runtime_error}
+  - {id: L3-ADV09, traces: [FR-7],        tier: adversarial, axis: [COR], weight: 1, test: test_adv09_boundary_timestamps_included}
+  - {id: L3-ADV10, traces: [FR-7],        tier: adversarial, axis: [COR], weight: 1, test: test_adv10_one_second_outside_excluded}
+  - {id: L3-ADV11, traces: [FR-7, FR-10], tier: adversarial, axis: [ROB], weight: 1, test: test_adv11_unparseable_since_is_usage_error}
+  - {id: L3-ADV12, traces: [NFR-1],       tier: adversarial, axis: [EFF, ROB], weight: 1, test: test_adv12_huge_input_streams_without_timeout}
+  - {id: L3-ADV13, traces: [FR-2],        tier: adversarial, axis: [COR], weight: 1, test: test_adv13_crlf_line_endings}
+  - {id: L3-ADV14, traces: [NFR-2],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv14_invalid_utf8_bytes_survivable}
+  - {id: L3-ADV15, traces: [NFR-2],       tier: adversarial, axis: [ROB], weight: 1, test: test_adv15_one_megabyte_single_line}
+  - {id: L3-ADV16, traces: [FR-3],        tier: adversarial, axis: [ROB], weight: 1, test: test_adv16_path_with_space_or_quote_is_malformed}
+  - {id: L3-ADV17, traces: [FR-5],        tier: adversarial, axis: [COR], weight: 1, test: test_adv17_status_boundaries_100_and_599}
+  - {id: L3-ADV18, traces: [FR-2],        tier: adversarial, axis: [COR], weight: 1, test: test_adv18_bytes_dash_is_valid}
+  - {id: L3-ADV19, traces: [FR-2],        tier: adversarial, axis: [ROB], weight: 1, test: test_adv19_lowercase_month_is_malformed}
+  - {id: L3-ADV20, traces: [FR-9],        tier: adversarial, axis: [ROB], weight: 1, test: test_adv20_repeated_top_last_wins}
+  - {id: L3-ADV21, traces: [FR-4, FR-8],  tier: adversarial, axis: [COR], weight: 1, test: test_adv21_large_distinct_path_set}
+  - {id: L3-ADV22, traces: [FR-12, NFR-2], tier: adversarial, axis: [ROB], weight: 1, test: test_adv22_broken_pipe_no_traceback}

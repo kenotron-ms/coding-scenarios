@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coding-scenarios.invalid/L3-log-analyzer/report.schema.json",
+  "title": "loganalyze report",
+  "description": "Stable, versioned schema for `loganalyze --format json` (REQUIREMENTS.md \u00a72.1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "window",
+    "totals",
+    "top_paths",
+    "status_counts",
+    "status_classes",
+    "error_rate"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["since", "until"],
+      "properties": {
+        "since": {"type": ["string", "null"]},
+        "until": {"type": ["string", "null"]}
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines_read", "entries_parsed", "malformed", "entries_in_window"],
+      "properties": {
+        "lines_read": {"type": "integer", "minimum": 0},
+        "entries_parsed": {"type": "integer", "minimum": 0},
+        "malformed": {"type": "integer", "minimum": 0},
+        "entries_in_window": {"type": "integer", "minimum": 0}
+      }
+    },
+    "top_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "count"],
+        "properties": {
+          "path": {"type": "string"},
+          "count": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "status_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[1-5][0-9]{2}$": {"type": "integer", "minimum": 1}
+      }
+    },
+    "status_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["1xx", "2xx", "3xx", "4xx", "5xx"],
+      "properties": {
+        "1xx": {"type": "integer", "minimum": 0},
+        "2xx": {"type": "integer", "minimum": 0},
+        "3xx": {"type": "integer", "minimum": 0},
+        "4xx": {"type": "integer", "minimum": 0},
+        "5xx": {"type": "integer", "minimum": 0}
+      }
+    },
+    "error_rate": {"type": "number", "minimum": 0, "maximum": 1}
+  }
+}

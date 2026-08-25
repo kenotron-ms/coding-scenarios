@@ -1,0 +1,26 @@
+level: 3
+scenario: L3-log-analyzer
+language: python
+workspace: solution/            # only agent-visible path; harness sets SOLUTION_DIR
+entrypoint:
+  kind: cli                     # the real path is a process, not an import
+  command: ["python", "-m", "loganalyze"]
+  cwd: solution/                # SOLUTION_DIR (the dir that contains loganalyze.py)
+build:
+  setup: []                     # stdlib only
+verify:
+  smoke: "pytest tests/smoke -q"
+  acceptance: "pytest tests/acceptance -q"
+  adversarial: "pytest tests/adversarial -q"
+budgets:
+  wall_clock_s: 1800
+  iterations_soft: 10
+  iterations_hard: 25
+  token_budget: 200000
+  interventions: 0
+regression:
+  strategy: rerun-matrix        # re-run the flag/format matrix; behavior must be
+                                # stable across invocations (GRADING.md §5)
+gate: "acceptance_pass >= 0.95" # GRADING.md §4; REQUIREMENTS §7.3 (0.95 floor)
+static_floor:
+  python: [ruff, pyright]
