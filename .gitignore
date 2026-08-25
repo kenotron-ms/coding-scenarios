@@ -50,3 +50,13 @@ yarn-error.log
 .env
 .env.local
 .env.*.local
+
+# Evaluation RUN OUTPUT (never source-controlled — may contain keys/prompts/paths)
+# The eval DEFINITIONS (SPEC.md, manifest.yaml, rubric.yaml, EVALUATION.md,
+# tests/, reference/) ARE committed; only produced run output is ignored.
+runs/
+.eval-out/
+*.junit.xml
+score.json
+!scenarios/**/reference/**        # keep reference solutions
+telemetry.json

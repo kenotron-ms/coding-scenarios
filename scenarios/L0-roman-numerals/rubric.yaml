@@ -1,0 +1,27 @@
+scenario: L0-roman-numerals
+weights: {COR: 70, ROB: 15, EFF: 5, AUT: 5, QUA: 5}   # sum 100 (RUBRIC_FRAMEWORK §3)
+pass_threshold: 85
+gate: "acceptance_pass == 1.0"                         # GRADING.md §4
+denominators:                                          # explicit; resolves the defect
+  acceptance: 6
+  adversarial: 8
+static_floor:
+  python: [ruff, pyright]                              # QUA hard floor
+judge:
+  QUA: {agent: grader, rubric: "framework/GRADING.md#6 (QUA template)"}
+# Check registry (GRADING.md §1). Each id maps 1:1 to a test function.
+checks:
+  - {id: L0-AC01, criterion: AC-1, traces: [FR-1, FR-2, FR-3], tier: acceptance, axis: [COR], weight: 1, test: test_round_trip_sweep}
+  - {id: L0-AC02, criterion: AC-1, traces: [FR-1],             tier: acceptance, axis: [COR], weight: 1, test: test_subtractive_forms}
+  - {id: L0-AC03, criterion: AC-1, traces: [FR-1, FR-2],       tier: acceptance, axis: [COR], weight: 1, test: test_known_values}
+  - {id: L0-AC04, criterion: AC-2, traces: [FR-4],             tier: acceptance, axis: [ROB], weight: 1, test: test_to_roman_invalid_raises}
+  - {id: L0-AC05, criterion: AC-2, traces: [FR-5],             tier: acceptance, axis: [ROB], weight: 1, test: test_from_roman_invalid_raises}
+  - {id: L0-AC06, criterion: AC-3, traces: [FR-5],             tier: acceptance, axis: [COR], weight: 1, test: test_case_policy_consistent}
+  - {id: L0-ADV01, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_IIII_invalid}
+  - {id: L0-ADV02, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_IC_invalid}
+  - {id: L0-ADV03, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_XM_invalid}
+  - {id: L0-ADV04, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_VX_invalid}
+  - {id: L0-ADV05, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_MMMM_out_of_range}
+  - {id: L0-ADV06, traces: [FR-5], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_empty_whitespace_invalid}
+  - {id: L0-ADV07, traces: [FR-3], tier: adversarial, axis: [COR], weight: 1, test: test_adv_boundary_1}
+  - {id: L0-ADV08, traces: [FR-3], tier: adversarial, axis: [COR], weight: 1, test: test_adv_boundary_3999}

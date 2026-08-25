@@ -184,4 +184,7 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
 | `framework/VERIFICATION_CONTRACT.md` | Test tiers, visibility, entrypoint contract |
 | `framework/CONVERGENCE_METRICS.md` | Telemetry definitions + capture |
 | `framework/ARTIFACT_GRADIENT.md` | Which research/design/product artifacts apply per level |
+| `framework/GRADING.md` | The grader: check registry, gate-expression grammar, axis→score, AI-judge prompts |
+| `framework/HARNESS.md` | The runner + how to drive a strategy + run-output discipline |
 | `scenarios/L0..L8/REQUIREMENTS.md` | The nine scenario definitions |
+| `scenarios/L0-*/{SPEC,manifest,rubric,EVALUATION}.*` + `tests/` | The proven L0 reference eval |

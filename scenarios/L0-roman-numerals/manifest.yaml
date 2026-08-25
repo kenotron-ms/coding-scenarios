@@ -1,0 +1,24 @@
+level: 0
+scenario: L0-roman-numerals
+language: python
+workspace: solution/            # only agent-visible path; harness sets SOLUTION_DIR
+entrypoint:
+  kind: python-module
+  target: roman                 # importable module name inside the solution dir
+build:
+  setup: []                     # stdlib only
+verify:
+  smoke: "pytest tests/smoke -q"
+  acceptance: "pytest tests/acceptance -q"
+  adversarial: "pytest tests/adversarial -q"
+budgets:
+  wall_clock_s: 300
+  iterations_soft: 4
+  iterations_hard: 10
+  token_budget: 40000
+  interventions: 0
+regression:
+  strategy: none                # single-shot deterministic unit (GRADING.md §5)
+gate: "acceptance_pass == 1.0"  # gate expression (GRADING.md §4)
+static_floor:
+  python: [ruff, pyright]

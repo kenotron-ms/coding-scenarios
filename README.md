@@ -40,6 +40,8 @@ strategies.
 | [`framework/VERIFICATION_CONTRACT.md`](framework/VERIFICATION_CONTRACT.md) | Test tiers (smoke/acceptance/adversarial), `manifest.yaml` entrypoint, `score.json` |
 | [`framework/CONVERGENCE_METRICS.md`](framework/CONVERGENCE_METRICS.md) | Telemetry (iterations, cost, interventions, regressions) → axis mapping |
 | [`framework/ARTIFACT_GRADIENT.md`](framework/ARTIFACT_GRADIENT.md) | Which research/product/design artifacts are required per level |
+| [`framework/GRADING.md`](framework/GRADING.md) | **The grader**: check registry (counted assertions), gate-expression grammar, axis→score, AI-judge prompts, `score.json` |
+| [`framework/HARNESS.md`](framework/HARNESS.md) | **The runner** (`framework/harness/run_scenario.py`): how to grade a solution and drive a strategy, output discipline |
 
 ## How each scenario is structured
 
@@ -69,8 +71,26 @@ the shape of the fall-off. See `RUBRIC_FRAMEWORK.md §6`.
 
 ## Status & next pass
 
-This pass authored the **requirements set** (this repo). The **executable
-harness** these documents specify — per-scenario `SPEC.md`, `manifest.yaml`,
-`tests/` (smoke/acceptance/adversarial), `rubric.yaml`, and reference `design/`
-artifacts for the upper rungs — is the next build pass. `VERIFICATION_CONTRACT.md`
-and each scenario's §6/§7 define exactly what that harness must produce.
+**Requirements set:** all nine scenarios (L0–L8) are fully specified.
+
+**Grader layer:** the grading contract (`framework/GRADING.md`) turns each
+scenario's §6/§7 into a machine- and agent-checkable grader — a counted **check
+registry** (fixing the "what's the denominator?" ambiguity), a **gate-expression
+grammar** (the five gate shapes across the ladder), automated axes + AI-judge
+prompts for `QUA`/`FID`, and the nested `score.json` (incl. the L7 per-sprint
+variant). A reference **runner** lives at `framework/harness/run_scenario.py`.
+
+**L0 is a fully-runnable, proven reference eval:** `SPEC.md` + `manifest.yaml` +
+`rubric.yaml` + `EVALUATION.md` + `tests/{smoke,acceptance,adversarial}` +
+`reference/` solutions. The grader **passes on the correct reference (score 99,
+Converged-Clean) and fails on a broken mutant (gate FAIL, score 0)** — proving it
+discriminates.
+
+**Next:** the same asset set for L1→L8. L1/L2 are cheap deterministic rungs
+(runnable like L0); L3–L7 need reference implementations + infra (server/browser/
+ssh fixtures); L8 needs a small requirements fix first (a wall-clock budget, a
+concrete perf number, a declared regression mechanism, and P0-tagged acceptance)
+before its perf+security gate is gradeable.
+
+Run output (`runs/`, `score.json`, transcripts) is **gitignored** — only the eval
+*definitions* are committed.
