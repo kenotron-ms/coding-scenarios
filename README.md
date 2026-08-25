@@ -156,15 +156,21 @@ variant). A reference **runner** lives at `framework/harness/run_scenario.py`.
 | L0 roman-numerals | PASS · 99 · Converged-Clean | gate FAIL · 0 | — |
 | L1 csv-parser | PASS · 98 · Converged-Clean | gate FAIL · 0 (36% acc) | a `csvlib` variant hits 100% acc but **gate-FAILs** via the `check:L1-CSVLIB-none` probe |
 | L2 lru-cache | PASS · 97 · Converged-Clean | gate FAIL · 0 (46% acc) | fake-clock TTL + hypothesis stateful invariants |
+| L3 log-analyzer | gate PASS · acc 100% (36/36) | gate FAIL · 0 (78% acc < 95% floor) | CLI: subprocess golden-file/exit-code tests; ≥95% gate |
+| L4 template-engine | gate PASS · acc 100% (47/47) | gate FAIL · 0 (13% acc) | multi-module library (lexer→parser→renderer); autoescape/injection checks |
+
+(L3/L4 reference *scores* land in Converged-Rough on the runner-only path — like L2's 75 — because `EFF`/`AUT` need `--telemetry` and `QUA`/`FID` need the grader agent; the **gate** is what proves discrimination, and it does.)
 
 The grader dependencies are in `framework/harness/requirements.txt`
 (`pytest`, `pyyaml`, `hypothesis`).
 
-**Next:** L3→L8. L3 (CLI) and L4 (library) are deterministic and buildable next;
-L5–L7 need live infra (server/browser/ssh fixtures); L8 needs a small
-requirements fix first (a wall-clock budget, a concrete perf number, a declared
-regression mechanism, and P0-tagged acceptance) before its perf+security gate is
-gradeable.
+**Next:** L5–L7 need live infra (server/browser/ssh fixtures) — the point where
+the lightweight local runner gives way to the `amplifier-evaluation` driver +
+DTU-per-variant. L8's REQUIREMENTS are now **gradeable-in-spec** (concrete
+budgets, a declared `workspace-snapshots` regression mechanism, P0-tagged
+acceptance, and named perf/security gate authorities all landed), but a *runnable*
+L8 grader still needs a Tauri + SSH harness. No coding agent has been RUN against
+the ladder yet — that is the driver layer.
 
 Run output (`runs/`, `score.json`, transcripts) is **gitignored** — only the eval
 *definitions* are committed.

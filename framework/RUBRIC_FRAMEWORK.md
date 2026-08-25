@@ -105,6 +105,17 @@ Above the hard gate, the weighted 0–100 yields a rating:
 A scenario's **pass threshold** (each §7.4) is the score at/above which we call
 the rung "converged" for **ladder-profile** purposes.
 
+**On the hard rungs, "passing" legitimately lands in Converged-Rough.** By design
+the pass thresholds for L5–L8 (68/68/68/66) fall inside the Converged-Rough band
+(55–69), *below* the Converged floor (70). This is intentional, not an
+inconsistency: at those rungs — a live service, a full app, a five-sprint
+delivery, a native+SSH desktop app — merely reaching working, gate-clearing code
+is a real achievement, and the band label honestly reflects that getting there is
+usually costly and messy. A strategy that reaches **Converged** (≥70) or
+**Converged-Clean** (≥85) on L5–L8 is doing something exceptional. (The lower
+rungs L0–L4 keep thresholds at/above the Converged floor, where clean convergence
+is the reasonable expectation.)
+
 ## 6. Ladder profile (cross-scenario)
 
 The headline artifact of a strategy evaluation is not one number but a profile:
