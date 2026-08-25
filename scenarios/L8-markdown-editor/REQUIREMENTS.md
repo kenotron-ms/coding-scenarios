@@ -36,10 +36,18 @@
   are load-bearing, not incidental.
 - **Estimated reference solution size:** 5,000–12,000 LoC across Rust
   (Tauri core/commands) + TypeScript (editor SPA); 60–120 files.
-- **Time budget:** Multi-session / multi-day. A single supervised run targets a
-  working slice; the full P0 surface is a **~2–4 day** budget for a strong
-  strategy (tunable — this rung is meant to stress sustained convergence).
-- **Iteration budget:** soft 60, hard 150 edit→verify cycles.
+- **Budgets (grading; the L8 row of `framework/GRADING.md §9`).** These are the
+  scenario's `EFF` budgets — declared in `manifest.yaml` `budgets` and
+  authoritative for scoring. Stated concretely here so `EFF` is computable:
+  - **`wall_clock_s`: 28800** (8 h; multi-session — the rung stresses sustained
+    convergence. A single supervised run targets a working slice of the
+    ~2–4 day full-P0 surface; the 8 h ceiling is the graded wall-clock bound.)
+  - **`iterations`: soft 60 / hard 150** edit→verify cycles.
+  - **`token_budget`: 3M**.
+  `EFF` scores against these per `GRADING.md §3` / `CONVERGENCE_METRICS §4`;
+  exceeding `wall_clock_s` or the hard iteration cap is terminal. (Values are
+  tunable at the ladder level, but fixed here — they are the numbers a grader
+  reads for L8.)
 - **Intervention budget:** 0. `clarify`-type interventions on the deliberately-open
   transport/editor-engine ambiguities (§1.6) are low severity and do not, by
   themselves, cap Autonomy. Any `hint`/`rescue` on the SSH/security surface is a
@@ -276,19 +284,31 @@ fixture vault) that the acceptance suite connects to as the "remote."
 - [ ] `clippy`/`rustfmt`/`eslint`/`tsc` clean; `axe` clean on main views.
 - [ ] Design + security-model artifacts (§5.4) present and matched by the build.
 
-### 4.4 Acceptance criteria (mapped)
-- AC-1 (FR-1/2/4): connect to the test `sshd`, list config hosts, browse the
+### 4.4 Acceptance criteria (mapped, with gate priority)
+Each criterion carries a **priority**: **P0** items form the gate's `p0_pass` set
+(`p0_pass == 1.0` is required — `GRADING.md §4`); **P1** items are scored, not
+gated. Priorities follow the FR/NFR tiering in §4.2. Per-assertion `weight`/count
+(the denominator) is fixed in the scenario's `rubric.yaml` per `GRADING.md §1`.
+- **AC-1 — P0** (FR-1/2/4): connect to the test `sshd`, list config hosts, browse the
   fixture vault, open a file — over real SSH.
-- AC-2 (FR-6): Mermaid + fenced-code render correctly; sanitized.
-- AC-3 (FR-7/8, NFR-4): edit and save with a **minimal diff**; unedited bytes
+- **AC-2 — P0** (FR-6, NFR-3): Mermaid + fenced-code render correctly; **sanitized**
+  (the sanitization assertion is the `L8-SEC-sanitize` security `gate_authority`, §6.2).
+- **AC-3 — P0** (FR-7/8, NFR-4): edit and save with a **minimal diff**; unedited bytes
   preserved.
-- AC-4 (FR-3, NFR-3): unknown host key prompts (not auto-accepted); no secret is
-  found in app state/logs.
-- AC-5 (FR-5): vaults + last session restore across restart; no secrets stored.
-- AC-6 (NFR-1): cold-boot/first-render budgets met, measured on the packaged app.
-- AC-7 (NFR-5): full keyboard editing path + `axe` clean.
-- AC-8 (FID): editing experience and host/vault flows match the hi-fi + interaction
-  specs; perceived-performance spec honored.
+- **AC-4 — P0** (FR-3, NFR-3): unknown host key prompts (not auto-accepted); no secret is
+  found in app state/logs (the `L8-SEC-hostkey` + `L8-SEC-nosecrets` security
+  `gate_authority` checks, §6.2).
+- **AC-5 — P0** (FR-5): vaults + last session restore across restart; no secrets stored.
+- **AC-6 — P0** (NFR-1): cold-boot/first-render budgets met, measured on the packaged app
+  (the `L8-PERF-*` perf `gate_authority` checks, §6.2).
+- **AC-7 — P0** (NFR-5): full keyboard editing path + `axe` clean on main views. The
+  keyboard-editing path is the P0 core; a11y polish beyond it is P1 (§4.2), scored
+  under FID/QUA rather than gated.
+- **AC-8 — P1** (FID): editing experience and host/vault flows match the hi-fi + interaction
+  specs; perceived-performance spec honored. Scored via the FID axis (§7), not gated.
+
+**P0 acceptance set** (the `p0_pass` denominator) = {AC-1, AC-2, AC-3, AC-4, AC-5,
+AC-6, AC-7}; **P1** = {AC-8}. `p0_pass == 1.0` means every P0 criterion above passes.
 
 ## 5. Discovery & Design Activities
 Per `ARTIFACT_GRADIENT.md` row L8, the full product/design surface is **Required**,
@@ -334,11 +354,38 @@ budget spec**) that this security- and performance-critical app demands.
     injection (must be sanitized); path-traversal / symlink / permission-denied
     over SFTP; very large files and deep trees; unicode/CRLF fidelity through the
     round-trip; missing ssh-agent / no valid key (clear failure, no crash).
-- **6.2 "Working" definition (the hard gate)** — **100% of P0 acceptance criteria
-  AND** the **cold-boot/first-render perf budget** met **AND** the **security
-  criteria** (host-key verification enforced + no secrets persisted/logged +
-  content sanitized) pass **AND ≥ 90% of the overall acceptance suite**. Security
-  and performance are non-negotiable at this rung — a beautiful editor that
+- **6.2 "Working" definition (the hard gate).** The gate is the boolean
+  expression (`GRADING.md §4`), evaluated over the check registry (`GRADING.md §1`):
+
+  ```
+  p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok
+  ```
+
+  Its named quantities for L8:
+  - **`p0_pass`** — weighted pass fraction of the **P0 acceptance set** (§4.4:
+    AC-1…AC-7); must equal **1.0**.
+  - **`acceptance_pass`** — weighted pass fraction of the whole acceptance suite;
+    must be **≥ 0.90**.
+  - **`perf_ok`** — **all perf `gate_authority` checks pass** (`axis∋EFF`). The
+    named authorities, measured on the **real packaged app** (numbers from NFR-1):
+    - `L8-PERF-coldboot` — cold start to an interactive window **≤ 800 ms** (cold).
+    - `L8-PERF-warmboot` — warm-cache start to an interactive window **≤ 400 ms**.
+    - `L8-PERF-firstrender` — time-to-first-render of a fetched file **≤ 300 ms**
+      after bytes arrive.
+  - **`security_ok`** — **all security `gate_authority` checks pass**. The named
+    authorities (from FR-3 / NFR-3 / FR-5):
+    - `L8-SEC-hostkey` — host-key verification enforced; an unknown/changed key
+      **prompts and is never auto-accepted** (TOFU).
+    - `L8-SEC-nosecrets` — **no passwords/private keys persisted or logged**; app
+      state + logs inspected clean.
+    - `L8-SEC-sanitize` — Markdown→HTML and Mermaid input **sanitized**; embedded
+      `<script>` / `javascript:` / Mermaid injection cannot execute.
+
+  Each `gate_authority` check can fail the gate **alone** (`GRADING.md §1/§4`).
+  The perf authorities are exercised by **AC-6**; `L8-SEC-hostkey` /
+  `L8-SEC-nosecrets` by **AC-4** (and the adversarial changed-key case in §6.1);
+  `L8-SEC-sanitize` by **AC-2** and the adversarial injection case. Security and
+  performance are non-negotiable at this rung — a beautiful editor that
   auto-accepts host keys or stores a password **fails outright**.
 - **6.3 Verification mechanics** — `desktop-app` kind: the harness builds/packages
   the Tauri app and drives it via `tauri-driver`/WebDriver (webview automation),
@@ -351,6 +398,17 @@ budget spec**) that this security- and performance-critical app demands.
   visible case but auto-accept the changed-key case) caps `ROB` and can trip the
   security gate. Reading held-out suites, weakening the test `sshd`'s host-key
   policy, or escaping the workspace is a `gaming_event` → disqualification.
+- **6.5 Regression strategy (declared) — `workspace-snapshots`** (`GRADING.md §5`;
+  `regression.strategy: workspace-snapshots` in `manifest.yaml`). L8's `REG` axis
+  is computed by **re-running the prior `acceptance` suite at mid-build workspace
+  snapshots**: at each snapshot, every previously-passing weight-bearing
+  acceptance check must still pass. A previously-passing check that later fails is
+  a regression — it caps `REG` per §7.2 and is recorded in telemetry
+  (`regressions_introduced`, `oscillations`). Snapshots are taken at natural build
+  milestones (e.g., SSH transport stabilized; document-model/serializer round-trip
+  proven; render pipeline landed; vault memory + session restore landed). This
+  fixes L8's `regression_pass` denominator and makes the `REG` axis well-defined
+  (single ambitious build, not L7's per-sprint `cumulative-union`).
 
 ## 7. Scoring Rubric
 - **7.1 Weight profile** (sum 100; **extends** `RUBRIC_FRAMEWORK.md §3`):
@@ -373,9 +431,13 @@ budget spec**) that this security- and performance-critical app demands.
   | QUA | clippy/tsc errors, secrets over IPC, broad Tauri scopes | clean but blurred Rust/TS boundaries or fat serializer | clean, minimal capabilities, isolated document model, typed IPC |
   | REG | later features break earlier ones within the build | minor transient regressions self-corrected | no regressions across the build |
   | FID | design/security artifacts missing or UI ignores them | present, partial match / sluggish feel / minor a11y gaps | artifacts complete, UI matches hi-fi, feels instant, keyboard+`axe` clean |
-- **7.3 Hard gate** — **100% of P0 acceptance criteria AND perf budget met AND
-  security criteria pass AND ≥ 90% overall.** Failing perf **or** security fails
-  the run regardless of feature completeness.
+- **7.3 Hard gate** — the §6.2 expression
+  `p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok`
+  (`GRADING.md §4`): **100% of the P0 acceptance set (§4.4) AND ≥ 90% overall AND
+  all perf `gate_authority` checks (`L8-PERF-coldboot/-warmboot/-firstrender`)
+  AND all security `gate_authority` checks (`L8-SEC-hostkey/-nosecrets/-sanitize`)**.
+  Failing perf **or** security fails the run regardless of feature completeness.
+  Gate false ⇒ run scored **Failed (0 overall)** (`RUBRIC_FRAMEWORK.md §4`).
 - **7.4 Pass threshold** — **66** (Converged). Slightly below L7's 68, reflecting
   the harder, more open, security-and-perf-gated surface — clearing L8 at 66+
   indicates a strategy that converges on native, remote, security-sensitive,
@@ -395,7 +457,9 @@ budget spec**) that this security- and performance-critical app demands.
   boot budget; thrash between SSH transports or editor engines (high `dead_ends`,
   low `EFF`); reliance on `hint`/`rescue` for the Rust/Tauri/SSH plumbing; design
   and threat-model artifacts written *after* the code (low `FID`).
-- **8.3 Instrumentation notes** — Track cold-boot/first-render timings as a
+- **8.3 Instrumentation notes** — Run the declared **`workspace-snapshots`**
+  regression suite (§6.5) at each mid-build snapshot to populate `regression_pass`
+  and the `REG` axis. Track cold-boot/first-render timings as a
   time-series across the build to expose perf drift; count `regressions_introduced`
   and `oscillations` specifically around the serializer (round-trip) and host-key
   handling; record every `interruption`/intervention on the security surface
