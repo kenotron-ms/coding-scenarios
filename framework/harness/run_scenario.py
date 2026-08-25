@@ -96,6 +96,26 @@ def static_floor(solution: Path, tools: list[str]) -> tuple[bool | None, list[st
     return (ok if ran else None), notes
 
 
+def run_probes(solution: Path, rubric: dict) -> dict:
+    """Evaluate named gate-authority probes (GRADING.md §1/§4) -> {id: bool}.
+
+    Supported kinds:
+      absent_import: passes iff the solution never imports `module` (e.g. L1's
+                     "stdlib csv is forbidden" -> check:L1-CSVLIB-none).
+    """
+    checks: dict[str, bool] = {}
+    for p in rubric.get("probes", []):
+        pid, kind = p.get("id"), p.get("kind")
+        if kind == "absent_import":
+            mod = re.escape(p["module"])
+            pat = re.compile(rf"^\s*(import\s+{mod}\b|from\s+{mod}\b)", re.M)
+            hit = any(pat.search(f.read_text(errors="ignore")) for f in solution.rglob("*.py"))
+            checks[pid] = not hit
+        else:  # unknown probe kind -> conservatively fail (do not silently pass a gate)
+            checks[pid] = False
+    return checks
+
+
 # --- axis scorers (defaults; anchors per scenario §7.2) --------------------
 
 def cor_score(acc: float, adv: float) -> int:
@@ -183,11 +203,12 @@ def main() -> int:
 
     floor_ok, floor_notes = static_floor(a.solution, rubric.get("static_floor", {}).get("python", []))
 
+    probes = run_probes(a.solution, rubric)
     ns = {
         "acceptance_pass": acc, "adversarial_pass": adv,
         "p0_pass": acc,           # L0-L5 have no P0 subset; equals acceptance
         "regression_pass": 1.0 if manifest.get("regression", {}).get("strategy") == "none" else acc,
-        "perf_ok": None, "security_ok": None, "checks": {},
+        "perf_ok": None, "security_ok": None, "checks": probes,
     }
     gate_expr = rubric.get("gate", "acceptance_pass == 1.0")
     passed = eval_gate(gate_expr, ns)

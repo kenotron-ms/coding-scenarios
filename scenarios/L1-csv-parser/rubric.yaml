@@ -1,0 +1,47 @@
+scenario: L1-csv-parser
+weights: {COR: 55, ROB: 25, EFF: 5, AUT: 5, QUA: 10}   # sum 100 (RUBRIC_FRAMEWORK §3)
+pass_threshold: 80
+gate: "acceptance_pass == 1.0 and check:L1-CSVLIB-none"   # GRADING.md §4; REQUIREMENTS §7.3
+denominators:                                             # explicit; resolves the defect
+  acceptance: 19
+  adversarial: 11
+static_floor:
+  python: [ruff, pyright]                                # QUA hard floor
+probes:                                                   # GRADING.md §1/§4; run_scenario.py absent_import
+  - {id: L1-CSVLIB-none, kind: absent_import, module: csv}
+judge:
+  QUA: {agent: grader, rubric: "framework/GRADING.md#6 (QUA template)"}
+# Check registry (GRADING.md §1). Each id maps 1:1 to a test function.
+checks:
+  # -- acceptance (denominator = 19) --------------------------------------
+  - {id: L1-AC01, criterion: AC-1, traces: [FR-2],           tier: acceptance, axis: [COR], weight: 1, test: test_quoted_field_basic}
+  - {id: L1-AC02, criterion: AC-1, traces: [FR-3],           tier: acceptance, axis: [COR], weight: 1, test: test_doubled_quote_escape}
+  - {id: L1-AC03, criterion: AC-1, traces: [FR-4],           tier: acceptance, axis: [COR], weight: 1, test: test_quoted_field_with_delimiter}
+  - {id: L1-AC04, criterion: AC-1, traces: [FR-5],           tier: acceptance, axis: [COR], weight: 1, test: test_quoted_field_with_newline}
+  - {id: L1-AC05, criterion: AC-1, traces: [FR-12],          tier: acceptance, axis: [COR], weight: 1, test: test_quote_inside_unquoted_field}
+  - {id: L1-AC06, criterion: AC-1, traces: [FR-2, FR-6],     tier: acceptance, axis: [COR], weight: 1, test: test_fully_empty_quoted_field}
+  - {id: L1-AC07, criterion: AC-2, traces: [FR-6],           tier: acceptance, axis: [COR], weight: 1, test: test_field_count_invariant}
+  - {id: L1-AC08, criterion: AC-2, traces: [FR-7],           tier: acceptance, axis: [COR, ROB], weight: 1, test: test_blank_line_yields_empty_field}
+  - {id: L1-AC09, criterion: AC-2, traces: [FR-8],           tier: acceptance, axis: [COR], weight: 1, test: test_trailing_separator_no_extra_row}
+  - {id: L1-AC10, criterion: AC-3, traces: [FR-9],           tier: acceptance, axis: [COR], weight: 1, test: test_line_endings_crlf_lf_mixed}
+  - {id: L1-AC11, criterion: AC-3, traces: [FR-9],           tier: acceptance, axis: [COR, ROB], weight: 1, test: test_lone_cr_is_data}
+  - {id: L1-AC12, criterion: AC-4, traces: [FR-10],          tier: acceptance, axis: [COR], weight: 1, test: test_unicode_roundtrip}
+  - {id: L1-AC13, criterion: AC-4, traces: [FR-11],          tier: acceptance, axis: [COR], weight: 1, test: test_custom_delimiter_and_quotechar}
+  - {id: L1-AC14, criterion: AC-4, traces: [FR-11],          tier: acceptance, axis: [ROB], weight: 1, test: test_invalid_parameters_raise}
+  - {id: L1-AC15, criterion: AC-5, traces: [FR-13],          tier: acceptance, axis: [ROB], weight: 1, test: test_ambiguity_consistency_matrix}
+  - {id: L1-AC16, criterion: AC-5, traces: [FR-13],          tier: acceptance, axis: [ROB], weight: 1, test: test_no_silent_dataloss_on_malformed}
+  - {id: L1-AC17, criterion: AC-6, traces: [],               tier: acceptance, axis: [EFF], weight: 1, test: test_performance_scaling}
+  - {id: L1-AC18, criterion: AC-7, traces: [],               tier: acceptance, axis: [QUA], weight: 1, test: test_docstring_documents_ambiguities}
+  - {id: L1-AC19, criterion: AC-1, traces: [FR-1, FR-2, FR-3, FR-4], tier: acceptance, axis: [COR], weight: 1, test: test_round_trip_hypothesis}
+  # -- adversarial (denominator = 11; feeds COR/ROB, never the gate) ------
+  - {id: L1-ADV01, traces: [FR-13], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unterminated_quote_mid_document}
+  - {id: L1-ADV02, traces: [FR-13], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unterminated_quote_at_end}
+  - {id: L1-ADV03, traces: [FR-13], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_chars_after_closing_quote}
+  - {id: L1-ADV04, traces: [FR-2],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_lone_quotechar_field}
+  - {id: L1-ADV05, traces: [FR-9],  tier: adversarial, axis: [COR, ROB], weight: 1, test: test_adv_mixed_crlf_lf_embedded_newlines}
+  - {id: L1-ADV06, traces: [FR-4, FR-5], tier: adversarial, axis: [COR], weight: 1, test: test_adv_delimiter_and_newline_in_quotes}
+  - {id: L1-ADV07, traces: [],      tier: adversarial, axis: [EFF, ROB], weight: 1, test: test_adv_large_field_1mb}
+  - {id: L1-ADV08, traces: [],      tier: adversarial, axis: [ROB], weight: 1, test: test_adv_bom_with_quoted_first_field}
+  - {id: L1-ADV09, traces: [],      tier: adversarial, axis: [ROB], weight: 1, test: test_adv_whitespace_padded_unquoted_fields}
+  - {id: L1-ADV10, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_crlf_only_document}
+  - {id: L1-ADV11, traces: [FR-13], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_last_line_unterminated_quote}

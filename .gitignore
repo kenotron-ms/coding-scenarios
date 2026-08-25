@@ -58,5 +58,8 @@ runs/
 .eval-out/
 *.junit.xml
 score.json
-!scenarios/**/reference/**        # keep reference solutions
 telemetry.json
+# Test/cache artifacts produced while running graders locally
+.pytest_cache/
+.hypothesis/
+!scenarios/**/reference/**        # keep reference solutions

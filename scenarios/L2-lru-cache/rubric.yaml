@@ -1,0 +1,67 @@
+scenario: L2-lru-cache
+weights: {COR: 45, ROB: 20, EFF: 12, AUT: 10, QUA: 13}   # sum 100 (REQUIREMENTS §7.1)
+pass_threshold: 78                                        # REQUIREMENTS §7.4
+gate: "acceptance_pass == 1.0"                            # GRADING.md §4; REQUIREMENTS §7.3
+denominators:                                             # explicit; resolves the defect
+  acceptance: 26
+  adversarial: 16
+static_floor:
+  python: [ruff, pyright]                                # QUA hard floor
+judge:
+  QUA: {agent: grader, rubric: "framework/GRADING.md#6 (QUA template)"}
+# Check registry (GRADING.md §1). Each id maps 1:1 to a test function.
+checks:
+  # -- AC-1 (FR-1): construction & validation --------------------------
+  - {id: L2-AC01, criterion: AC-1, traces: [FR-1],         tier: acceptance, axis: [ROB], weight: 1, test: test_invalid_capacity_raises}
+  - {id: L2-AC02, criterion: AC-1, traces: [FR-1],         tier: acceptance, axis: [ROB], weight: 1, test: test_invalid_ttl_raises}
+  - {id: L2-AC03, criterion: AC-1, traces: [FR-1],         tier: acceptance, axis: [COR], weight: 1, test: test_valid_construction_succeeds}
+  # -- AC-2 (FR-2,FR-3,FR-4): eviction victim, recency refresh ---------
+  - {id: L2-AC04, criterion: AC-2, traces: [FR-3],         tier: acceptance, axis: [COR], weight: 1, test: test_eviction_victim_is_lru}
+  - {id: L2-AC05, criterion: AC-2, traces: [FR-4],         tier: acceptance, axis: [COR], weight: 1, test: test_get_refreshes_recency}
+  - {id: L2-AC06, criterion: AC-2, traces: [FR-4],         tier: acceptance, axis: [COR], weight: 1, test: test_put_refreshes_recency}
+  - {id: L2-AC07, criterion: AC-2, traces: [FR-3, FR-4],   tier: acceptance, axis: [COR], weight: 1, test: test_deterministic_eviction_order_across_capacities}
+  # -- AC-3 (FR-5,FR-9): peek/in non-disturbance -----------------------
+  - {id: L2-AC08, criterion: AC-3, traces: [FR-5],         tier: acceptance, axis: [COR], weight: 1, test: test_peek_does_not_refresh_or_count}
+  - {id: L2-AC09, criterion: AC-3, traces: [FR-9],         tier: acceptance, axis: [COR], weight: 1, test: test_contains_does_not_refresh_or_count}
+  - {id: L2-AC10, criterion: AC-3, traces: [FR-5],         tier: acceptance, axis: [COR], weight: 1, test: test_peek_interleaved_matches_peek_free_eviction}
+  # -- AC-4 (FR-6): update-in-place -------------------------------------
+  - {id: L2-AC11, criterion: AC-4, traces: [FR-6],         tier: acceptance, axis: [COR], weight: 1, test: test_update_existing_key_at_capacity_no_eviction}
+  # -- AC-5 (FR-7,FR-8): TTL lazy expiry --------------------------------
+  - {id: L2-AC12, criterion: AC-5, traces: [FR-7],         tier: acceptance, axis: [COR], weight: 1, test: test_ttl_none_never_expires}
+  - {id: L2-AC13, criterion: AC-5, traces: [FR-7, FR-8],   tier: acceptance, axis: [COR], weight: 1, test: test_ttl_expiry_absent_from_all_views}
+  - {id: L2-AC14, criterion: AC-5, traces: [FR-7],         tier: acceptance, axis: [COR], weight: 1, test: test_ttl_boundary_exact_at_ttl}
+  - {id: L2-AC15, criterion: AC-5, traces: [FR-7],         tier: acceptance, axis: [COR], weight: 1, test: test_ttl_zero_immediate_expiry}
+  - {id: L2-AC16, criterion: AC-5, traces: [FR-7],         tier: acceptance, axis: [COR], weight: 1, test: test_ttl_policy_declared_matches_insertion_behavior}
+  # -- AC-6 (FR-10): accounting ------------------------------------------
+  - {id: L2-AC17, criterion: AC-6, traces: [FR-10],        tier: acceptance, axis: [COR], weight: 1, test: test_stats_hit_miss_accounting}
+  - {id: L2-AC18, criterion: AC-6, traces: [FR-10],        tier: acceptance, axis: [COR], weight: 1, test: test_stats_eviction_count_capacity_driven_only}
+  - {id: L2-AC19, criterion: AC-6, traces: [FR-10],        tier: acceptance, axis: [ROB], weight: 1, test: test_stats_snapshot_is_inert}
+  # -- AC-7 (FR-11,FR-12): clock injection & instance independence -----
+  - {id: L2-AC20, criterion: AC-7, traces: [FR-11],        tier: acceptance, axis: [ROB], weight: 1, test: test_clock_injection_enforced_time_poisoned}
+  - {id: L2-AC21, criterion: AC-7, traces: [FR-12],        tier: acceptance, axis: [ROB], weight: 1, test: test_instance_independence}
+  # -- AC-8 (NFR-1): O(1) complexity probe -------------------------------
+  - {id: L2-AC22, criterion: AC-8, traces: [NFR-1],        tier: acceptance, axis: [COR], weight: 1, test: test_op_comparison_counts_flat_across_capacity}
+  # -- AC-9 (NFR-2): property / stateful invariants ----------------------
+  - {id: L2-AC23, criterion: AC-9, traces: [NFR-2],        tier: acceptance, axis: [COR], weight: 1, test: test_stateful_invariants}
+  - {id: L2-AC24, criterion: AC-9, traces: [NFR-2, FR-10], tier: acceptance, axis: [COR], weight: 1, test: test_property_counters_consistent_with_naive_oracle}
+  - {id: L2-AC25, criterion: AC-9, traces: [NFR-2, FR-2],  tier: acceptance, axis: [COR], weight: 1, test: test_property_get_returns_latest_put_value}
+  # -- AC-10 (NFR-3): docs / static hygiene -------------------------------
+  - {id: L2-AC26, criterion: AC-10, traces: [NFR-3],       tier: acceptance, axis: [QUA], weight: 1, test: test_docstrings_present_and_describe_semantics}
+
+  # -- Adversarial (hidden; feeds COR/ROB, never the gate) ----------------
+  - {id: L2-ADV01, traces: [FR-3],          tier: adversarial, axis: [COR], weight: 1, test: test_adv_capacity_one_always_evicts_new_key}
+  - {id: L2-ADV02, traces: [FR-6],          tier: adversarial, axis: [COR], weight: 1, test: test_adv_capacity_one_reput_same_key_no_evict}
+  - {id: L2-ADV03, traces: [FR-7],          tier: adversarial, axis: [ROB], weight: 1, test: test_adv_ttl_boundary_inclusive_peek_and_get_agree}
+  - {id: L2-ADV04, traces: [FR-1, FR-7],    tier: adversarial, axis: [ROB], weight: 1, test: test_adv_ttl_zero_falsy_trap}
+  - {id: L2-ADV05, traces: [FR-6],          tier: adversarial, axis: [COR], weight: 1, test: test_adv_reput_existing_key_exactly_at_capacity}
+  - {id: L2-ADV06, traces: [FR-7, FR-10],   tier: adversarial, axis: [COR], weight: 1, test: test_adv_access_then_expire_then_reinsert}
+  - {id: L2-ADV07, traces: [FR-4, FR-5],    tier: adversarial, axis: [COR], weight: 1, test: test_adv_peek_then_get_ordering_effects}
+  - {id: L2-ADV08, traces: [FR-3, FR-7],    tier: adversarial, axis: [COR], weight: 1, test: test_adv_long_interleaved_sequence_with_clock_jumps}
+  - {id: L2-ADV09, traces: [FR-1],          tier: adversarial, axis: [ROB], weight: 1, test: test_adv_ttl_large_float_and_int_both_valid}
+  - {id: L2-ADV10, traces: [FR-2, FR-9],    tier: adversarial, axis: [ROB], weight: 1, test: test_adv_falsy_values_distinguishable_from_absent}
+  - {id: L2-ADV11, traces: [FR-2],          tier: adversarial, axis: [ROB], weight: 1, test: test_adv_hash_colliding_equal_keys_treated_as_one}
+  - {id: L2-ADV12, traces: [FR-2],          tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unhashable_key_raises_typeerror}
+  - {id: L2-ADV13, traces: [FR-1],          tier: adversarial, axis: [ROB], weight: 1, test: test_adv_capacity_invalid_types_raise}
+  - {id: L2-ADV14, traces: [FR-11],         tier: adversarial, axis: [ROB], weight: 1, test: test_adv_huge_clock_jump}
+  - {id: L2-ADV15, traces: [FR-10],         tier: adversarial, axis: [ROB], weight: 1, test: test_adv_stats_snapshot_mutation_inert}
+  - {id: L2-ADV16, traces: [FR-3, FR-12],   tier: adversarial, axis: [COR], weight: 1, test: test_adv_two_instances_different_capacities_lockstep}

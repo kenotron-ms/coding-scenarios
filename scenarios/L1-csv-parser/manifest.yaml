@@ -1,0 +1,24 @@
+level: 1
+scenario: L1-csv-parser
+language: python
+workspace: solution/            # only agent-visible path; harness sets SOLUTION_DIR
+entrypoint:
+  kind: python-module
+  target: csvparse               # importable module name inside the solution dir
+build:
+  setup: []                      # stdlib only
+verify:
+  smoke: "pytest tests/smoke -q"
+  acceptance: "pytest tests/acceptance -q"
+  adversarial: "pytest tests/adversarial -q"
+budgets:
+  wall_clock_s: 900
+  iterations_soft: 6
+  iterations_hard: 15
+  token_budget: 80000
+  interventions: 0
+regression:
+  strategy: none                 # single-shot deterministic unit (GRADING.md §5)
+gate: "acceptance_pass == 1.0 and check:L1-CSVLIB-none"   # GRADING.md §4
+static_floor:
+  python: [ruff, pyright]

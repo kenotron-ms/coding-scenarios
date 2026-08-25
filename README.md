@@ -59,6 +59,72 @@ Every `scenarios/L*/REQUIREMENTS.md` contains, in order:
 8. Convergence Signals     (healthy vs pathological patterns, instrumentation notes)
 ```
 
+## Running a strategy against the ladder
+
+The thing you evaluate is a **strategy** — a coding agent or harness that, given
+a scenario's spec, produces a solution. Running one is two separate steps, kept
+apart so the grader is identical no matter who produced the solution:
+
+**1. Drive the strategy to produce a solution.** Hand it *only* the scenario's
+`SPEC.md` and its `tests/smoke/` (the visible workspace). It must produce a
+solution satisfying the entrypoint in `manifest.yaml` (for L0–L2, an importable
+module: `roman`, `csvparse`, `lru`). It must **never** see `tests/acceptance/`
+or `tests/adversarial/` — those are held out to grade it.
+
+**2. Grade the produced solution** with the reference runner. It runs the tiers,
+computes the axes, applies the gate, and writes `score.json`.
+
+Try it right now against the shipped reference solution (which stands in for "a
+strategy's output"):
+
+```bash
+pip install -r framework/harness/requirements.txt
+
+python3 framework/harness/run_scenario.py \
+  --scenario scenarios/L1-csv-parser \
+  --solution scenarios/L1-csv-parser/reference/solution \
+  --strategy my-strategy@v1 \
+  --out runs/$(date +%Y%m%d-%H%M%S)/L1/
+# -> gate PASS · score 98 · Converged-Clean; score.json written to the out dir
+```
+
+Point `--solution` at whatever directory your strategy produced — the runner puts
+that dir on the import path and loads the `manifest.yaml` target from it.
+
+**Wiring in your own agent.** The loop your harness automates, per scenario:
+
+```
+1. Fresh, isolated workspace. Copy in SPEC.md + tests/smoke/ ONLY.
+2. Run your agent on SPEC.md until it declares done (or hits a budget).
+   Capture telemetry -> telemetry.json (iterations, wall_clock_s, tokens,
+   interventions[], failed_runs_before_pass, ...). See framework/HARNESS.md §2.
+3. Grade it:
+     python3 framework/harness/run_scenario.py \
+       --scenario scenarios/L<n>-<slug> \
+       --solution <the-dir-your-agent-produced> \
+       --telemetry telemetry.json \
+       --strategy <name> --out runs/<dt>/L<n>/
+4. Read score.json: gate passed?, per-axis 0-4, weighted score, band.
+5. Repeat across scenarios; aggregate score.json into the ladder profile.
+```
+
+`--telemetry` feeds the `EFF` (efficiency) and `AUT` (autonomy) axes; omit it and
+those two are `null` (the score then reflects only the tiers + quality floor).
+`QUA`/`FID` (the fuzzy axes) are graded by an agent — see `framework/GRADING.md §6`.
+
+**What "fits" the grader.** A strategy passes a rung when it clears that
+scenario's **gate** (e.g. L0–L2 need 100% acceptance; L1 also must not
+`import csv`) *and* its weighted score reaches the **pass threshold**. Because
+the acceptance/adversarial tiers are held out, a strategy can't game them — it
+only ever sees `SPEC.md` + smoke.
+
+**Driving real agents / A-B comparisons.** To run an actual coding agent
+(Amplifier, Claude Code, Copilot, …) in isolation, capture its session, and
+compare variants, use the `amplifier-evaluation` library with a Digital Twin
+Universe profile per variant (`framework/HARNESS.md §2`). Run outputs (`runs/`,
+`score.json`, transcripts) are **gitignored** — only eval *definitions* are
+committed.
+
 ## Scoring in one paragraph
 
 A run must first clear a **hard gate** (the acceptance suite floor) — you cannot
@@ -80,17 +146,25 @@ grammar** (the five gate shapes across the ladder), automated axes + AI-judge
 prompts for `QUA`/`FID`, and the nested `score.json` (incl. the L7 per-sprint
 variant). A reference **runner** lives at `framework/harness/run_scenario.py`.
 
-**L0 is a fully-runnable, proven reference eval:** `SPEC.md` + `manifest.yaml` +
-`rubric.yaml` + `EVALUATION.md` + `tests/{smoke,acceptance,adversarial}` +
-`reference/` solutions. The grader **passes on the correct reference (score 99,
-Converged-Clean) and fails on a broken mutant (gate FAIL, score 0)** — proving it
-discriminates.
+**L0, L1, and L2 are fully-runnable, proven reference evals** — each ships
+`SPEC.md` + `manifest.yaml` + `rubric.yaml` + `EVALUATION.md` +
+`tests/{smoke,acceptance,adversarial}` + `reference/` solutions, and each grader
+**passes on a correct reference and fails on a broken mutant**:
 
-**Next:** the same asset set for L1→L8. L1/L2 are cheap deterministic rungs
-(runnable like L0); L3–L7 need reference implementations + infra (server/browser/
-ssh fixtures); L8 needs a small requirements fix first (a wall-clock budget, a
-concrete perf number, a declared regression mechanism, and P0-tagged acceptance)
-before its perf+security gate is gradeable.
+| Rung | reference | broken mutant | extra |
+|------|-----------|---------------|-------|
+| L0 roman-numerals | PASS · 99 · Converged-Clean | gate FAIL · 0 | — |
+| L1 csv-parser | PASS · 98 · Converged-Clean | gate FAIL · 0 (36% acc) | a `csvlib` variant hits 100% acc but **gate-FAILs** via the `check:L1-CSVLIB-none` probe |
+| L2 lru-cache | PASS · 97 · Converged-Clean | gate FAIL · 0 (46% acc) | fake-clock TTL + hypothesis stateful invariants |
+
+The grader dependencies are in `framework/harness/requirements.txt`
+(`pytest`, `pyyaml`, `hypothesis`).
+
+**Next:** L3→L8. L3 (CLI) and L4 (library) are deterministic and buildable next;
+L5–L7 need live infra (server/browser/ssh fixtures); L8 needs a small
+requirements fix first (a wall-clock budget, a concrete perf number, a declared
+regression mechanism, and P0-tagged acceptance) before its perf+security gate is
+gradeable.
 
 Run output (`runs/`, `score.json`, transcripts) is **gitignored** — only the eval
 *definitions* are committed.

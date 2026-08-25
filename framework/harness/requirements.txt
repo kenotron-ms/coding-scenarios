@@ -1,0 +1,8 @@
+# Harness (grader) dependencies — the environment that RUNS the graders.
+# NOTE: this is distinct from the per-scenario SOLUTION constraints. Solutions
+# are stdlib-only (see each SPEC.md); these deps are for the grader/runner only.
+pyyaml>=6.0
+pytest>=8.0
+hypothesis>=6.0        # property/stateful tests (L1 round-trip, L2 invariants)
+# Static-floor tools used for the QUA floor when present on PATH (optional):
+#   ruff, pyright
