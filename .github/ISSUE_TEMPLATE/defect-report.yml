@@ -1,0 +1,68 @@
+name: Defect report
+description: Report a defect in a form the autonomous pipeline can work with. Describe what the software does, not what the fix should be.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repo runs an autonomous pipeline that can take a well-specified defect report to a
+        proposed fix. Whether it converges depends almost entirely on the quality of this report.
+
+        Three rules that measurably decide the outcome.
+
+        1. Describe what the software does, not what the fix should be. The pipeline verifies
+           against behavior, and a prescribed fix narrows and biases its verification gate.
+        2. Be self-contained. Everything needed to understand the defect belongs here, in plain
+           English. The pipeline reads this text, not your browser tabs.
+        3. Quote real output. Paste the actual bytes the commands produced, not a paraphrase.
+
+        The measured guidance is the canonical repo's
+        https://github.com/microsoft/amplifier-bundle-attractor/blob/main/docs/ISSUE_PIPELINE.md.
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: The observable behavior, in plain English. What does the software actually do? Stick to observations, no diagnosis, no proposed fix.
+      placeholder: Calling apply_discount(100, 150) returns -50.0.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Exact reproduction
+      description: The exact commands you ran and the actual output they produced, quoted verbatim. This is the single most important field. The pipeline builds an executable gate from observable behavior, and a reproduction it can run is the strongest possible input.
+      render: shell
+      placeholder: |
+        $ python -c "from src.discount import apply_discount; print(apply_discount(100, 150))"
+        -50.0
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected instead, stated plainly. Expected vs actual is what makes a defect checkable. Saying what should happen is not a fix prescription. Saying how to change the code is.
+      placeholder: When percent_off exceeds 100 the item is free, so the result should clamp to 0.0, never negative.
+    validations:
+      required: true
+  - type: input
+    id: observed-on
+    attributes:
+      label: Commit SHA or branch observed on
+      description: The SHA (preferred) or branch where you observed the behavior. The pipeline pins its verification to a base commit, so knowing where you saw it matters.
+      placeholder: "e.g. 89033fd, or main as of 2026-08-25"
+    validations:
+      required: true
+  - type: input
+    id: affected-area
+    attributes:
+      label: Affected area or module (optional)
+      description: If you know roughly where the behavior lives (a module, a file, a function), name it. Leave blank if unsure, a wrong guess is worse than no guess.
+      placeholder: "e.g. src/discount.py, apply_discount"
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        What happens next. A maintainer reviews this report and, if it is pipeline-ready, applies
+        the ready:spec label to hand it to the pipeline. That label is deliberately
+        maintainer-applied, never automatic.
