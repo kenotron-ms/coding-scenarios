@@ -1,0 +1,92 @@
+scenario: L4-template-engine
+weights: {COR: 30, ROB: 15, EFF: 14, AUT: 12, QUA: 13, REG: 8, FID: 8}   # sum 100 (REQUIREMENTS §7.1)
+pass_threshold: 70
+gate: "acceptance_pass >= 0.95"                          # GRADING.md §4 (L3–L4); REQUIREMENTS §6.2/§7.3
+denominators:                                            # explicit; equal to the real test counts (no drift)
+  acceptance: 47
+  adversarial: 26
+static_floor:
+  python: [ruff, pyright]                                # QUA hard floor; plus the AC44 no-eval/exec source scan
+regression:
+  strategy: per-group-diff                               # GRADING.md §5 (L4)
+judge:                                                   # AI-graded axes (GRADING.md §6); left null by the runner
+  QUA: {agent: grader, rubric: "framework/GRADING.md#6 (QUA template)"}
+  FID: {agent: grader, rubric: "framework/GRADING.md#6 (FID template)", inputs: [design/]}
+# Check registry (GRADING.md §1). Each id maps 1:1 to a test function; weight 1 each,
+# so the per-tier denominator is the row count (acceptance 47, adversarial 26).
+checks:
+  # -- acceptance (denominator = 47) --------------------------------------
+  - {id: L4-AC01, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_interpolation_simple}
+  - {id: L4-AC02, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_interpolation_dotted}
+  - {id: L4-AC03, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_interpolation_index_access}
+  - {id: L4-AC04, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_interpolation_deep_chain}
+  - {id: L4-AC05, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_mapping_before_attribute}
+  - {id: L4-AC06, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_non_string_values_stringified}
+  - {id: L4-AC07, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_text_only_and_empty_template}
+  - {id: L4-AC08, criterion: AC-2, traces: [FR-2],  group: G2,  tier: acceptance, axis: [COR], weight: 1, test: test_if_comparison_operators}
+  - {id: L4-AC09, criterion: AC-2, traces: [FR-2],  group: G2,  tier: acceptance, axis: [COR], weight: 1, test: test_if_boolean_ops_and_precedence}
+  - {id: L4-AC10, criterion: AC-2, traces: [FR-2],  group: G2,  tier: acceptance, axis: [COR], weight: 1, test: test_if_elif_else_chain}
+  - {id: L4-AC11, criterion: AC-2, traces: [FR-2],  group: G2,  tier: acceptance, axis: [COR], weight: 1, test: test_if_nested}
+  - {id: L4-AC12, criterion: AC-2, traces: [FR-2],  group: G2,  tier: acceptance, axis: [COR], weight: 1, test: test_if_truthiness_and_no_else}
+  - {id: L4-AC13, criterion: AC-3, traces: [FR-3],  group: G3,  tier: acceptance, axis: [COR], weight: 1, test: test_for_basic_and_all_loop_fields}
+  - {id: L4-AC14, criterion: AC-3, traces: [FR-3],  group: G3,  tier: acceptance, axis: [COR], weight: 1, test: test_for_nested_shadowing}
+  - {id: L4-AC15, criterion: AC-3, traces: [FR-3],  group: G3,  tier: acceptance, axis: [COR], weight: 1, test: test_for_scope_restore}
+  - {id: L4-AC16, criterion: AC-3, traces: [FR-3],  group: G3,  tier: acceptance, axis: [COR, ROB], weight: 1, test: test_for_empty_iterable}
+  - {id: L4-AC17, criterion: AC-3, traces: [FR-3],  group: G3,  tier: acceptance, axis: [COR], weight: 1, test: test_for_over_dict_and_string}
+  - {id: L4-AC18, criterion: AC-4, traces: [FR-4],  group: G4,  tier: acceptance, axis: [COR], weight: 1, test: test_include_mapping_loader}
+  - {id: L4-AC19, criterion: AC-4, traces: [FR-4],  group: G4,  tier: acceptance, axis: [COR], weight: 1, test: test_include_callable_loader}
+  - {id: L4-AC20, criterion: AC-4, traces: [FR-4, FR-3], group: G4, tier: acceptance, axis: [COR], weight: 1, test: test_include_inside_loop_sees_loop_vars}
+  - {id: L4-AC21, criterion: AC-4, traces: [FR-4],  group: G4,  tier: acceptance, axis: [ROB], weight: 1, test: test_include_missing_and_no_loader}
+  - {id: L4-AC22, criterion: AC-5, traces: [FR-5],  group: G5,  tier: acceptance, axis: [COR], weight: 1, test: test_builtin_filters}
+  - {id: L4-AC23, criterion: AC-5, traces: [FR-5],  group: G5,  tier: acceptance, axis: [COR], weight: 1, test: test_default_filter_semantics}
+  - {id: L4-AC24, criterion: AC-5, traces: [FR-5],  group: G5,  tier: acceptance, axis: [COR], weight: 1, test: test_filter_chaining_and_literal_args}
+  - {id: L4-AC25, criterion: AC-5, traces: [FR-5],  group: G5,  tier: acceptance, axis: [COR], weight: 1, test: test_user_filter_and_shadowing}
+  - {id: L4-AC26, criterion: AC-5, traces: [FR-5],  group: G5,  tier: acceptance, axis: [ROB], weight: 1, test: test_unknown_and_raising_filter}
+  - {id: L4-AC27, criterion: AC-6, traces: [FR-6, NFR-3], group: G6, tier: acceptance, axis: [COR, ROB], weight: 1, test: test_autoescape_on_escapes_all_five}
+  - {id: L4-AC28, criterion: AC-6, traces: [FR-6],  group: G6,  tier: acceptance, axis: [COR], weight: 1, test: test_autoescape_off_and_literal_never_escaped}
+  - {id: L4-AC29, criterion: AC-6, traces: [FR-6],  group: G6,  tier: acceptance, axis: [COR], weight: 1, test: test_autoescape_precedence_and_env_inheritance}
+  - {id: L4-AC30, criterion: AC-7, traces: [FR-7],  group: G7,  tier: acceptance, axis: [ROB], weight: 1, test: test_strict_undefined_raises_named_path}
+  - {id: L4-AC31, criterion: AC-7, traces: [FR-7],  group: G7,  tier: acceptance, axis: [COR], weight: 1, test: test_lenient_undefined_and_default_intercepts}
+  - {id: L4-AC32, criterion: AC-9, traces: [FR-9, NFR-2], group: G8, tier: acceptance, axis: [ROB], weight: 1, test: test_position_unterminated_tag}
+  - {id: L4-AC33, criterion: AC-9, traces: [FR-9, NFR-2], group: G8, tier: acceptance, axis: [ROB], weight: 1, test: test_position_unclosed_block_points_opener}
+  - {id: L4-AC34, criterion: AC-9, traces: [FR-9, NFR-2], group: G8, tier: acceptance, axis: [ROB], weight: 1, test: test_position_mismatched_and_stray_closer}
+  - {id: L4-AC35, criterion: AC-9, traces: [FR-9, NFR-2], group: G8, tier: acceptance, axis: [ROB], weight: 1, test: test_position_multiline_and_tabs}
+  - {id: L4-AC36, criterion: AC-10, traces: [FR-10], group: G9,  tier: acceptance, axis: [COR], weight: 1, test: test_public_names_and_exception_hierarchy}
+  - {id: L4-AC37, criterion: AC-10, traces: [FR-10], group: G9,  tier: acceptance, axis: [COR], weight: 1, test: test_signatures_keyword_only}
+  - {id: L4-AC38, criterion: AC-10, traces: [NFR-2], group: G9,  tier: acceptance, axis: [COR, ROB], weight: 1, test: test_render_none_equiv_and_context_not_mutated}
+  - {id: L4-AC39, criterion: AC-8, traces: [FR-8],  group: G10, tier: acceptance, axis: [COR], weight: 1, test: test_render_independence_across_calls}
+  - {id: L4-AC40, criterion: AC-8, traces: [FR-8],  group: G10, tier: acceptance, axis: [COR], weight: 1, test: test_environment_caches_compiled_template}
+  - {id: L4-AC41, criterion: AC-8, traces: [NFR-1], group: G10, tier: acceptance, axis: [EFF], weight: 1, test: test_linear_output_under_budget}
+  - {id: L4-AC42, criterion: AC-7, traces: [FR-7],  group: G11, tier: acceptance, axis: [COR, ROB], weight: 1, test: test_a1_lenient_uniform_across_positions}
+  - {id: L4-AC43, criterion: AC-6, traces: [FR-6],  group: G11, tier: acceptance, axis: [COR], weight: 1, test: test_a3_autoescape_explicit_and_inherited}
+  - {id: L4-AC44, criterion: AC-11, traces: [NFR-3], group: Gsec, tier: acceptance, axis: [QUA], weight: 1, test: test_no_eval_exec_in_source}
+  - {id: L4-AC45, criterion: AC-11, traces: [NFR-3], group: Gsec, tier: acceptance, axis: [ROB], weight: 1, test: test_sandbox_refuses_underscore_access}
+  - {id: L4-AC46, criterion: AC-1, traces: [FR-1],  group: G1,  tier: acceptance, axis: [COR], weight: 1, test: test_plaintext_roundtrips_unchanged}
+  - {id: L4-AC47, criterion: AC-9, traces: [NFR-2], group: G8,  tier: acceptance, axis: [ROB], weight: 1, test: test_error_taxonomy_no_foreign_exception}
+  # -- adversarial (denominator = 26; feeds COR/ROB, never the gate) ------
+  - {id: L4-ADV01, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unterminated_interpolation}
+  - {id: L4-ADV02, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_if_without_condition}
+  - {id: L4-ADV03, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_stray_endfor}
+  - {id: L4-ADV04, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_if_endfor_mismatch}
+  - {id: L4-ADV05, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unknown_tag}
+  - {id: L4-ADV06, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_else_outside_if}
+  - {id: L4-ADV07, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_empty_expression}
+  - {id: L4-ADV08, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_leading_pipe}
+  - {id: L4-ADV09, traces: [FR-9],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_trailing_pipe}
+  - {id: L4-ADV10, traces: [FR-9, NFR-2], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unclosed_block_at_eof_points_opener}
+  - {id: L4-ADV11, traces: [NFR-2], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_crlf_positions_exact}
+  - {id: L4-ADV12, traces: [NFR-2], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_tab_indented_position}
+  - {id: L4-ADV13, traces: [FR-5],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_unknown_filter}
+  - {id: L4-ADV14, traces: [FR-5],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_filter_that_raises}
+  - {id: L4-ADV15, traces: [FR-5],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_default_missing_argument}
+  - {id: L4-ADV16, traces: [FR-5],  tier: adversarial, axis: [COR, ROB], weight: 1, test: test_adv_length_on_non_sized}
+  - {id: L4-ADV17, traces: [FR-3],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_for_non_iterable_target}
+  - {id: L4-ADV18, traces: [FR-1, NFR-2], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_none_in_the_middle_of_chain}
+  - {id: L4-ADV19, traces: [FR-3],  tier: adversarial, axis: [COR, ROB], weight: 1, test: test_adv_four_deep_nested_loops_with_shadowing}
+  - {id: L4-ADV20, traces: [FR-4],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_include_missing_name}
+  - {id: L4-ADV21, traces: [FR-4],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_self_include_cycle}
+  - {id: L4-ADV22, traces: [FR-4],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_indirect_include_cycle}
+  - {id: L4-ADV23, traces: [NFR-3], tier: adversarial, axis: [ROB], weight: 1, test: test_adv_sandbox_dunder_probes}
+  - {id: L4-ADV24, traces: [FR-6, NFR-3], tier: adversarial, axis: [COR, ROB], weight: 1, test: test_adv_injection_autoescape_on_and_off}
+  - {id: L4-ADV25, traces: [FR-7],  tier: adversarial, axis: [ROB], weight: 1, test: test_adv_undefined_in_both_modes}
+  - {id: L4-ADV26, traces: [NFR-1], tier: adversarial, axis: [EFF, ROB], weight: 1, test: test_adv_large_nested_loop_is_linear}
