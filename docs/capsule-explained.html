@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Work Capsule — a definition of done a machine can prove</title>
+<meta name="description" content="An engineering explainer for the work capsule: a falsifiable gate, proven RED for the right reason at a pinned base SHA, non-vacuous, judged by an independent critic — and the two Attractor graphs that build and consume it.">
+<style>
+/* ---------------------------------------------------------------- tokens */
+:root{
+  --paper:#faf7f1;
+  --paper-2:#f2ede3;
+  --ink:#1b1813;
+  --ink-2:#3a352c;
+  --muted:#6d6558;
+  --faint:#a29886;
+  --rule:#d9d1c1;
+  --rule-2:#e7e0d2;
+  --accent:#c0400f;          /* vermilion — gates, evidence, hazards */
+  --accent-2:#8f3110;
+  --accent-tint:#fbeee6;
+  --pass:#2f6b3a;
+  --pass-tint:#eaf1e7;
+  --code:#f3efe5;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Helvetica Neue",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --col:720px;
+  --wide:960px;
+}
+/* ---------------------------------------------------------------- base */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--serif);font-size:18px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{font-family:var(--serif);font-weight:600;line-height:1.15;margin:0;letter-spacing:-.012em}
+p{margin:0 0 1.05em}
+a{color:var(--accent-2);text-decoration:none;border-bottom:1px solid rgba(192,64,15,.32)}
+a:hover{border-bottom-color:var(--accent)}
+code,kbd,pre,samp{font-family:var(--mono)}
+hr{border:0;border-top:1px solid var(--rule);margin:56px 0}
+::selection{background:#f6dcc9}
+
+/* ---------------------------------------------------------------- layout */
+.col{max-width:var(--col);margin:0 auto;padding:0 24px}
+.wide{max-width:var(--wide);margin:0 auto;padding:0 24px}
+main section{padding:56px 0 8px;scroll-margin-top:64px}
+main section:first-of-type{padding-top:40px}
+
+/* ---------------------------------------------------------------- nav */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(250,247,241,.93);
+  -webkit-backdrop-filter:saturate(140%) blur(8px);backdrop-filter:saturate(140%) blur(8px);
+  border-bottom:1px solid var(--rule);
+}
+.topbar .wide{display:flex;align-items:baseline;gap:22px;height:52px;overflow-x:auto;scrollbar-width:none}
+.topbar .wide::-webkit-scrollbar{display:none}
+.brand{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);border:0;white-space:nowrap}
+.brand span{color:var(--accent)}
+.topbar nav{display:flex;gap:18px;white-space:nowrap}
+.topbar nav a{
+  font-family:var(--sans);font-size:12.5px;letter-spacing:.02em;color:var(--muted);
+  border:0;padding:2px 0;border-bottom:1px solid transparent;
+}
+.topbar nav a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ---------------------------------------------------------------- hero */
+.hero{border-bottom:1px solid var(--rule);padding:64px 0 44px;background:
+  linear-gradient(to bottom,#fbf9f4,var(--paper) 70%)}
+.hero h1{font-size:clamp(48px,8.4vw,88px);letter-spacing:-.035em;line-height:.96;margin:0 0 14px}
+.hero .sub{font-size:clamp(19px,2.4vw,25px);color:var(--ink-2);max-width:660px;margin:0 0 26px;line-height:1.35}
+.hero .lede{max-width:660px;font-size:18.5px;color:var(--ink-2)}
+.kicker{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+.meta{font-family:var(--sans);font-size:13px;color:var(--muted);margin-top:22px}
+.meta code{font-size:12.5px;background:var(--code);padding:1px 5px;border:1px solid var(--rule-2)}
+
+/* ---------------------------------------------------------------- section heads */
+.eyebrow{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.eyebrow .num{color:var(--faint);margin-right:10px}
+h2{font-size:clamp(30px,4.4vw,42px);margin:0 0 18px;letter-spacing:-.022em}
+h3{font-size:23px;margin:34px 0 12px}
+h4{font-size:16.5px;margin:26px 0 8px;font-family:var(--sans);font-weight:700;letter-spacing:-.005em}
+.standfirst{font-size:21px;line-height:1.45;color:var(--ink-2);margin:0 0 28px;max-width:660px}
+
+/* ---------------------------------------------------------------- figures */
+figure{margin:34px auto;max-width:var(--wide);padding:0 24px}
+figure.tight{margin:24px auto}
+figure svg{display:block;width:100%;height:auto}
+figcaption{
+  font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--muted);
+  margin-top:12px;padding-top:9px;border-top:1px solid var(--rule-2);max-width:660px;
+}
+figcaption b{color:var(--ink-2);font-weight:600}
+.fig-title{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
+.dg text{font-family:var(--sans);fill:var(--ink)}
+.dg .nl{font-size:14px;font-weight:600}
+.dg .nl-s{font-size:11.5px;font-weight:400;fill:var(--muted);font-family:var(--mono)}
+.dg .el{font-size:11.5px;font-family:var(--mono);fill:var(--muted)}
+.dg .el-a{font-size:11.5px;font-family:var(--mono);fill:var(--accent)}
+.dg .el-g{font-size:11.5px;font-family:var(--mono);fill:var(--pass)}
+.dg .cap{font-size:11.5px;fill:var(--faint);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.dg .n{fill:#fff;stroke:var(--ink);stroke-width:1.6}
+.dg .n-g{fill:var(--accent-tint);stroke:var(--accent);stroke-width:2}
+.dg .n-p{fill:var(--pass-tint);stroke:var(--pass);stroke-width:1.6}
+.dg .n-q{fill:var(--paper-2);stroke:var(--rule);stroke-width:1.4}
+.dg .e{stroke:var(--ink);stroke-width:1.6;fill:none}
+.dg .e-a{stroke:var(--accent);stroke-width:1.8;fill:none}
+.dg .e-g{stroke:var(--pass);stroke-width:1.8;fill:none}
+.dg .e-m{stroke:var(--faint);stroke-width:1.3;fill:none;stroke-dasharray:4 4}
+
+/* ---------------------------------------------------------------- code */
+pre{
+  background:var(--code);border:1px solid var(--rule-2);border-radius:3px;
+  padding:16px 18px;overflow-x:auto;font-size:13.2px;line-height:1.62;margin:22px 0;
+  color:var(--ink);
+}
+pre.wide-code{max-width:var(--wide);margin-left:auto;margin-right:auto;font-size:12.4px;line-height:1.72;padding:16px}
+p code,li code,td code,figcaption code,dd code{
+  font-size:.855em;background:var(--code);border:1px solid var(--rule-2);
+  padding:.5px 4px;border-radius:2px;white-space:nowrap;
+}
+pre code{font-size:inherit;background:none;border:0;padding:0;border-radius:0;white-space:pre;color:inherit}
+.at{color:var(--accent-2)}
+.st{color:var(--muted)}
+.cm{color:var(--faint);font-style:italic}
+.kw{font-weight:700}
+.rd{color:var(--accent);font-weight:700}
+.gn{color:var(--pass);font-weight:700}
+
+/* ---------------------------------------------------------------- notes */
+.note{border:1px solid var(--rule);border-radius:2px;padding:18px 20px 6px;margin:26px 0;background:#fdfbf7}
+.note.hazard{border-top:2px solid var(--accent)}
+.note.good{border-top:2px solid var(--pass)}
+.note-label{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+.note.good .note-label{color:var(--pass)}
+.note p{font-size:16.5px;line-height:1.55}
+.note p:last-child{margin-bottom:14px}
+blockquote{
+  margin:26px 0;padding:0;font-size:22px;line-height:1.35;font-style:italic;color:var(--ink)
+}
+blockquote p{margin:0 0 8px}
+blockquote cite{display:block;font-style:normal;font-family:var(--sans);font-size:12.5px;letter-spacing:.04em;color:var(--muted)}
+
+/* ---------------------------------------------------------------- tables */
+table{width:100%;border-collapse:collapse;margin:22px 0;font-family:var(--sans);font-size:14px}
+caption{caption-side:top;text-align:left;font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding-bottom:8px}
+th{
+  text-align:left;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1.5px solid var(--ink);padding:0 12px 7px 0;vertical-align:bottom;
+}
+td{border-bottom:1px solid var(--rule-2);padding:9px 12px 9px 0;vertical-align:top;line-height:1.45}
+tbody tr:nth-child(even){background:rgba(242,237,227,.5)}
+td code,th code{font-size:12.5px;background:none;border:0;padding:0;white-space:nowrap;color:var(--accent-2)}
+.t-wrap{max-width:var(--wide);margin:0 auto;padding:0 24px;overflow-x:auto}
+
+/* ---------------------------------------------------------------- novelty list */
+.novel{max-width:var(--wide);margin:0 auto;padding:0 24px}
+.novel-item{border-top:1px solid var(--rule);padding:30px 0 6px;display:grid;grid-template-columns:74px minmax(0,1fr);gap:0 20px}
+.novel-item .n{
+  font-family:var(--sans);font-size:13px;font-weight:700;color:var(--accent);
+  letter-spacing:.1em;padding-top:9px;
+}
+.novel-item h3{margin:0 0 10px;font-size:26px}
+.novel-item .body{max-width:660px}
+.novel-item .body p{font-size:17.5px}
+.pull{font-family:var(--serif);font-size:19px;font-style:italic;color:var(--accent-2);margin:16px 0;line-height:1.4;max-width:600px}
+
+/* ---------------------------------------------------------------- two-up */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 34px;margin:24px 0}
+.two > div{border-top:1.5px solid var(--ink);padding-top:12px}
+.two > div.g{border-top-color:var(--accent)}
+.two h4{margin:0 0 6px}
+.two p{font-size:16px;color:var(--ink-2);margin-bottom:.7em}
+
+/* ---------------------------------------------------------------- steps */
+ol.steps{list-style:none;counter-reset:s;margin:18px 0 0;padding:0}
+ol.steps > li{
+  counter-increment:s;position:relative;padding:14px 0 14px 62px;border-top:1px solid var(--rule-2);
+}
+ol.steps > li:first-child{border-top:1px solid var(--rule)}
+ol.steps > li::before{
+  content:counter(s,decimal-leading-zero);position:absolute;left:0;top:15px;
+  font-family:var(--mono);font-size:12.5px;color:var(--accent);letter-spacing:.04em;
+}
+ol.steps > li .lbl{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:3px}
+ol.steps > li p{font-size:17px;margin:0}
+ol.steps > li p + p{margin-top:6px}
+
+/* ---------------------------------------------------------------- misc lists */
+ul.plain{list-style:none;padding:0;margin:18px 0}
+ul.plain > li{padding:10px 0 10px 26px;border-top:1px solid var(--rule-2);position:relative;font-size:17px}
+ul.plain > li::before{content:"";position:absolute;left:2px;top:20px;width:9px;height:1.5px;background:var(--accent)}
+ol.qs{counter-reset:q;list-style:none;padding:0;margin:22px 0}
+ol.qs > li{counter-increment:q;position:relative;padding:16px 0 16px 54px;border-top:1px solid var(--rule)}
+ol.qs > li::before{
+  content:counter(q);position:absolute;left:0;top:14px;width:30px;height:30px;line-height:29px;text-align:center;
+  border:1.5px solid var(--accent);color:var(--accent);border-radius:50%;font-family:var(--sans);font-size:14px;font-weight:700;
+}
+ol.qs h4{margin:0 0 4px;font-size:18px;font-family:var(--serif);font-weight:600}
+ol.qs p{margin:0;font-size:16.5px;color:var(--ink-2)}
+
+/* ---------------------------------------------------------------- footer */
+footer{border-top:1px solid var(--rule);margin-top:70px;padding:44px 0 70px;background:var(--paper-2)}
+footer .col{font-family:var(--sans);font-size:14px;color:var(--muted)}
+footer h2{font-size:22px;margin-bottom:14px;font-family:var(--sans);letter-spacing:0}
+footer ul{list-style:none;padding:0;margin:0 0 22px}
+footer li{padding:7px 0;border-bottom:1px solid var(--rule)}
+footer .fine{font-size:12.5px;line-height:1.6;color:var(--faint);max-width:640px}
+
+/* ---------------------------------------------------------------- responsive */
+@media (max-width:820px){
+  body{font-size:17px}
+  p code,li code,td code,figcaption code,dd code{white-space:normal;overflow-wrap:anywhere}
+  .novel-item{grid-template-columns:1fr;gap:0}
+  .novel-item .n{padding-top:0;margin-bottom:6px}
+  .two{grid-template-columns:1fr;gap:22px}
+  figure{padding:0 18px}
+  .col,.wide,.novel,.t-wrap{padding:0 18px}
+}
+</style>
+</head>
+<body id="top">
+
+<!-- shared arrow markers for every inline diagram -->
+<svg aria-hidden="true" focusable="false" width="0" height="0" style="position:absolute;left:-9999px" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9.4" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1b1813"/>
+    </marker>
+    <marker id="ar-a" viewBox="0 0 10 10" refX="9.4" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0400f"/>
+    </marker>
+    <marker id="ar-g" viewBox="0 0 10 10" refX="9.4" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2f6b3a"/>
+    </marker>
+    <marker id="ar-m" viewBox="0 0 10 10" refX="9.4" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a29886"/>
+    </marker>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="wide">
+    <a class="brand" href="#top">Work<span>·</span>Capsule</a>
+    <nav aria-label="Sections">
+      <a href="#problem">Problem</a>
+      <a href="#idea">Big idea</a>
+      <a href="#novel">What's novel</a>
+      <a href="#mechanics">Under the hood</a>
+      <a href="#runthrough">Run-through</a>
+      <a href="#when">What it is not</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================ 1. HERO -->
+<section class="hero" aria-labelledby="h-hero">
+  <div class="col">
+    <p class="kicker">Attractor · capsule pipeline</p>
+    <h1 id="h-hero">The&nbsp;work capsule</h1>
+    <p class="sub">A definition of done a <em>machine</em> can prove — and a human can approve in minutes.</p>
+    <p class="lede">A work capsule is two files: <code>DEFINITION.md</code>, the human-approvable spec, and <code>DEFINITION.verify.sh</code>, an executable gate whose <strong>exit code is the definition of done</strong>. The trick is not the gate; it is what the pipeline <em>proves about</em> the gate before anyone is asked to trust it: that it goes <span class="rd">RED</span> on the unfixed code <em>for the stated reason</em>, that it is not vacuous, and that it is not so broad it passes on anything. Two Attractor graphs bracket the capsule — one <strong>builds and proves</strong> it, the other <strong>consumes</strong> it to write real code until it turns <span class="gn">GREEN</span> and two independent critics agree.</p>
+    <p class="meta">Built on: <code>capsule.dot</code> (specify — build &amp; prove) &middot; <code>task-runner.dot</code> (implement — build until green) &middot; the Attractor engine (fail-closed <code>goal_gate</code>s, convergence loops, <code>must_write</code> contracts)</p>
+  </div>
+
+  <figure>
+    <p class="fig-title">Diagram 1 — the signature shape: a gate whose exit code is the spec</p>
+    <svg class="dg" viewBox="0 0 960 300" role="img" aria-labelledby="d1t d1d" xmlns="http://www.w3.org/2000/svg">
+      <title id="d1t">The falsifiable gate</title>
+      <desc id="d1d">One script, DEFINITION.verify.sh, run against two inputs. Against the code at base_sha it must exit 1 and print the declared red_signal — proven RED for the right reason. Against a correct fix it exits 0 — GREEN. Exit code two or more means an infrastructure problem, not a verdict.</desc>
+
+      <text class="cap" x="150" y="40" text-anchor="middle">two inputs</text>
+      <text class="cap" x="500" y="40" text-anchor="middle">one script &middot; the capsule gate</text>
+      <text class="cap" x="835" y="40" text-anchor="middle">exit code = the verdict</text>
+
+      <!-- inputs -->
+      <rect class="n" x="40" y="72" width="220" height="52" rx="2"/>
+      <text class="nl" x="150" y="94" text-anchor="middle">code @ base_sha</text>
+      <text class="nl-s" x="150" y="112" text-anchor="middle">the defect, unfixed</text>
+
+      <rect class="n-p" x="40" y="176" width="220" height="52" rx="2"/>
+      <text class="nl" x="150" y="198" text-anchor="middle">code @ base_sha + fix</text>
+      <text class="nl-s" x="150" y="216" text-anchor="middle">the defect, repaired</text>
+
+      <!-- the gate (parallelogram) -->
+      <polygon class="n-g" points="410,78 610,78 590,222 390,222"/>
+      <text class="nl" x="500" y="140" text-anchor="middle">DEFINITION</text>
+      <text class="nl" x="500" y="160" text-anchor="middle">.verify.sh</text>
+      <text class="nl-s" x="500" y="182" text-anchor="middle">set -euo pipefail</text>
+
+      <!-- input edges -->
+      <line class="e-a" x1="262" y1="98" x2="404" y2="118" marker-end="url(#ar-a)"/>
+      <line class="e-g" x1="262" y1="202" x2="404" y2="182" marker-end="url(#ar-g)"/>
+
+      <!-- exit chips -->
+      <rect class="n-g" x="700" y="74" width="240" height="46" rx="2"/>
+      <text class="nl" x="720" y="103" text-anchor="start" style="fill:#c0400f">1</text>
+      <text class="nl-s" x="742" y="95" text-anchor="start" style="fill:#3a352c">RED — defect present</text>
+      <text class="nl-s" x="742" y="112" text-anchor="start">+ prints red_signal</text>
+
+      <rect class="n-p" x="700" y="132" width="240" height="46" rx="2"/>
+      <text class="nl" x="720" y="161" text-anchor="start" style="fill:#2f6b3a">0</text>
+      <text class="nl-s" x="742" y="153" text-anchor="start" style="fill:#3a352c">GREEN — fixed</text>
+      <text class="nl-s" x="742" y="170" text-anchor="start">done, provably</text>
+
+      <rect class="n-q" x="700" y="190" width="240" height="40" rx="2"/>
+      <text class="nl-s" x="720" y="214" text-anchor="start">&#8805;2 &nbsp; infrastructure problem</text>
+
+      <!-- exit edges -->
+      <line class="e-a" x1="592" y1="120" x2="696" y2="100" marker-end="url(#ar-a)"/>
+      <line class="e-g" x1="592" y1="176" x2="696" y2="154" marker-end="url(#ar-g)"/>
+      <line class="e-m" x1="592" y1="200" x2="696" y2="208" marker-end="url(#ar-m)"/>
+    </svg>
+    <figcaption><b>The capsule's exit code <em>is</em> its definition of done.</b> A capsule is only shippable once the pipeline has watched this one script return <span class="rd">1</span> on the defect (and print the exact <code>red_signal</code>) and confirmed a crude fix can drive it to <span class="gn">0</span> — so the gate is neither blind to the bug nor satisfied by nothing.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 2. PROBLEM -->
+<section id="problem" aria-labelledby="h-problem">
+  <div class="col">
+    <p class="eyebrow"><span class="num">01</span>The problem</p>
+    <h2 id="h-problem">"Done" is a sentence nobody can run</h2>
+    <p class="standfirst">Hand an LLM a task and it will tell you when it is finished. That is the whole problem. The definition of done lives in prose — in the issue, in the acceptance criteria, in the model's own summary of its own work — and prose is not executable. Nothing checks it. Nobody re-runs it.</p>
+    <p>Three failure modes follow, and they are not hypothetical:</p>
+    <ul class="plain">
+      <li><b>The model grades its own homework.</b> If the only thing between a run and "done" is the worker's assessment of its own output, a single plausible-but-wrong response ends the run successfully.</li>
+      <li><b>An unproven gate passes on anything.</b> A test that never actually failed on the broken code proves nothing when it passes on the fixed code. It might pass on <em>everything</em>.</li>
+      <li><b>A gate can pass a lie.</b> A check that greps for a success string, or pipes its own exit status away, will report success over a red test suite — and every CI light stays green, because nothing downstream executes it.</li>
+    </ul>
+    <p>The work capsule's answer is to refuse to treat "done" as prose. It compiles the definition of done into a <em>script</em>, and then — before a human is ever asked to approve it, and before a single line of the real fix is written — it spends a whole pipeline <em>proving that the script is a good judge</em>. The proofs are the point. The capsule is what survives them.</p>
+
+    <blockquote>
+      <p>"A capsule PR is a proposal that a human is asked to approve on the strength of proofs about a script; if the script that arrives is not the script that was proven, the proofs are worthless and nothing notices."</p>
+      <cite>— verify_shipped_gate.sh, on why the shipped bytes are re-checked</cite>
+    </blockquote>
+  </div>
+</section>
+
+<!-- ============================================================ 3. BIG IDEA -->
+<section id="idea" aria-labelledby="h-idea">
+  <div class="col">
+    <p class="eyebrow"><span class="num">02</span>The big idea</p>
+    <h2 id="h-idea">A definition of done, compiled to a gate — and proven before it is trusted</h2>
+    <p class="standfirst">The specify graph carries one sentence, and everything it does is in service of it. It is worth reading in full, because it is not a description of the capsule — it <em>is</em> the goal the graph converges on:</p>
+
+    <blockquote>
+      <p>"Given an issue-shaped report and a pinned base SHA, produce a work capsule (DEFINITION.md + DEFINITION.verify.sh) that is machine-proven RED-for-the-right-reason at that SHA and non-vacuous, judged behavior-bound by one critic, and authored in upstream-legal vocabulary — a definition of done a human can approve in minutes."</p>
+      <cite>— capsule.dot, the <code>goal=</code> attribute</cite>
+    </blockquote>
+
+    <p>Unpack that and every clause is a proof obligation:</p>
+    <ul class="plain">
+      <li><b>a pinned base SHA</b> — the gate is proven against one exact commit, written to <code>.ai/base-sha</code> and shipped as the capsule's <code>base_sha</code>. Every measurement in the pipeline first proves the tree actually sits at that SHA, because a dirty tree poisons every verdict downstream.</li>
+      <li><b>machine-proven RED-for-the-right-reason</b> — run at that SHA the gate must exit <code>1</code> <em>and</em> emit a declared <code>red_signal</code> string, so the red is the bug rather than an unrelated crash.</li>
+      <li><b>non-vacuous</b> — a crude, deliberately-wrong patch must be able to turn the gate green, proving the gate is reachable at all and not satisfied by nothing.</li>
+      <li><b>judged behavior-bound by one critic</b> — machines settle the facts; a single independent judge (a second model family) rules on the residue they cannot decide, and its verdict is anchored to an exact line.</li>
+      <li><b>upstream-legal vocabulary</b> — the DEFINITION is scanned for leaked internal terms before it can ship, so a public capsule PR reads clean.</li>
+    </ul>
+
+    <div class="note good">
+      <p class="note-label">The governing doctrine</p>
+      <p>The graph states its own philosophy in its header: <em>"Machines prove facts. One judge rules the residue machines can't decide. Nothing with a measured miss record gets acquittal power over an executed result. Every gate is born advisory, names the goal clause it enforces, and carries a retirement condition."</em> That is why the pipeline is mostly mechanical checks with exactly one LLM judgment node — and why lessons land as one-line charter rules, not as an ever-growing pile of nodes.</p>
+    </div>
+  </div>
+
+  <figure>
+    <p class="fig-title">Diagram 2 — the six files that make up one capsule</p>
+      <svg class="dg" viewBox="0 0 960 300" role="img" aria-labelledby="d2t d2d" xmlns="http://www.w3.org/2000/svg">
+        <title id="d2t">The six files that make up a capsule folder</title>
+        <desc id="d2d">A capsule folder shares one id stem across six files: the DEFINITION markdown and the verify.sh gate are the load-bearing pair handed to implement; the pinned base-sha, two shape-different hypothesis patches, and a discrimination record are the proofs that earned the pair its approval.</desc>
+
+        <text class="cap" x="222" y="40" text-anchor="middle">the load-bearing pair</text>
+        <text class="cap" x="710" y="40" text-anchor="middle">the proofs that earned its approval</text>
+
+        <!-- pair -->
+        <rect class="n" x="60" y="66" width="320" height="60" rx="2"/>
+        <text class="nl" x="220" y="94" text-anchor="middle">&lt;id&gt;.md</text>
+        <text class="nl-s" x="220" y="113" text-anchor="middle">DEFINITION — the approvable spec</text>
+
+        <polygon class="n-g" points="92,150 380,150 356,222 68,222"/>
+        <text class="nl" x="222" y="184" text-anchor="middle">&lt;id&gt;.verify.sh</text>
+        <text class="nl-s" x="222" y="203" text-anchor="middle">the gate — exit code is the DoD</text>
+
+        <!-- proofs 2x2 -->
+        <rect class="n-q" x="500" y="66" width="200" height="56" rx="2"/>
+        <text class="nl-s" x="600" y="90" text-anchor="middle">&lt;id&gt;.base-sha</text>
+        <text class="nl-s" x="600" y="108" text-anchor="middle" style="fill:#a29886">the pinned commit</text>
+
+        <rect class="n-q" x="720" y="66" width="200" height="56" rx="2"/>
+        <text class="nl-s" x="820" y="90" text-anchor="middle">&lt;id&gt;.hypothesis.patch</text>
+        <text class="nl-s" x="820" y="108" text-anchor="middle" style="fill:#a29886">crude fix A</text>
+
+        <rect class="n-q" x="500" y="140" width="200" height="56" rx="2"/>
+        <text class="nl-s" x="600" y="164" text-anchor="middle">&lt;id&gt;.discrimination.md</text>
+        <text class="nl-s" x="600" y="182" text-anchor="middle" style="fill:#a29886">over-broadness record</text>
+
+        <rect class="n-q" x="720" y="140" width="200" height="56" rx="2"/>
+        <text class="nl-s" x="820" y="164" text-anchor="middle">&lt;id&gt;.hypothesis-b.patch</text>
+        <text class="nl-s" x="820" y="182" text-anchor="middle" style="fill:#a29886">crude fix B — different shape</text>
+
+        <!-- connectors -->
+        <line class="e-m" x1="382" y1="96" x2="496" y2="94" marker-end="url(#ar-m)"/>
+        <line class="e-m" x1="382" y1="186" x2="496" y2="168" marker-end="url(#ar-m)"/>
+
+        <text class="nl-s" x="220" y="266" text-anchor="middle" style="fill:#a29886">all six share one id stem</text>
+        <text class="nl-s" x="710" y="266" text-anchor="middle" style="fill:#a29886">handed to implement as a single same-stem pair</text>
+      </svg>
+    <figcaption>The <code>.md</code> and <code>.verify.sh</code> are what implement consumes. The <code>base-sha</code>, the two shape-different hypothesis patches, and the discrimination record are the evidence trail — kept in the folder so a reviewer can see <em>why</em> the gate was trusted, not just that it was.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 4. NOVEL -->
+<section id="novel" aria-labelledby="h-novel">
+  <div class="col">
+    <p class="eyebrow"><span class="num">03</span>What's novel</p>
+    <h2 id="h-novel">The proofs that make a gate trustworthy</h2>
+    <p class="standfirst">Any project can write a test and call it a spec. What is distinctive here is the ring of adversarial proofs the pipeline runs <em>against its own gate</em> before shipping it — and the incidents, recorded in the graphs themselves, that each proof was bought with.</p>
+  </div>
+
+  <div class="novel">
+
+    <div class="novel-item">
+      <div class="n">01</div>
+      <div class="body">
+        <h3>Red for the <em>stated</em> reason</h3>
+        <p>A gate that fails on the broken code is necessary but not sufficient — it could be failing because the file does not import, or the interpreter crashed. The <code>redgate</code> node requires <em>both</em> conditions: the gate exits <code>1</code>, <em>and</em> the DEFINITION's declared <code>red_signal</code> string appears in the run's log. Only then is the red "red for the stated reason rather than an unrelated crash."</p>
+        <p class="pull">"rc==1 AND the declared red_signal appears in the red run's log."</p>
+      </div>
+    </div>
+
+    <div class="novel-item">
+      <div class="n">02</div>
+      <div class="body">
+        <h3>Non-vacuity, proven by two crude fixes</h3>
+        <p>Before the gate is trusted, three adversarial patch-writers attack it. <code>mutate</code> writes a <em>deliberately crude</em> hypothesis patch — <em>"that hardcodes, stubs, or early-returns its way to making the gate exit 0. This is explicitly NOT a correct fix."</em> <code>mutate_b</code> writes a second one that must be <em>"DIFFERENT IN SHAPE, IDENTICAL IN OBSERVABLE OUTCOME."</em> If two mechanically-different hacks can both green the gate, the gate is reachable and not welded to one guessed fix. Both crude patches ship in the capsule folder as <code>.hypothesis.patch</code> and <code>.hypothesis-b.patch</code>, so the reviewer can see the escape hatches the gate deliberately allows.</p>
+      </div>
+    </div>
+
+    <div class="novel-item">
+      <div class="n">03</div>
+      <div class="body">
+        <h3>The void ratchet — dodges that never come back to life</h3>
+        <p>The third attacker, <code>void</code>, tries to defeat the gate by <em>deleting the witness</em> — disabling the very assertion that catches the bug. Any void patch that greens a gate draft is archived durably (content-deduped, capped at eight), and here is the ratchet: <code>nonvacuity_gate</code> re-runs <em>every archived dodge</em> against the <em>current</em> gate on every round, under a bounded time wall — never a silent skip. A hole you closed in round two cannot quietly reopen in round five.</p>
+        <div class="note good">
+          <p class="note-label">Honest scope — the named residual</p>
+          <p>The ratchet's own comment refuses to overclaim: <em>"this ratchet is ANTI-FORGETTING, not ANTI-ADVERSARY. The archive and the ledger are worker-writable… nothing here prevents that deletion; what it now does is make it VISIBLE."</em> Every guard in the system names the attack it does <em>not</em> close and the condition under which it can retire. That honesty is a design rule, not a footnote.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="novel-item">
+      <div class="n">04</div>
+      <div class="body">
+        <h3>Discrimination — the gate that isn't over-broad</h3>
+        <p>A gate can be red-for-the-right-reason and still be <em>too broad</em> — red on the bug, but also red on unrelated code that has nothing to do with it. The <code>discrimination_check</code> exit gate runs the gate at an unrelated <em>later</em> commit and requires it to go red there too, catching "a gate that passes on anything." It is the one proof that is <em>skippable</em> — with a written reason — when no later commit is supplied.</p>
+        <div class="note hazard">
+          <p class="note-label">Read this before you trust a capsule</p>
+          <p>Because this proof is skippable, a capsule can ship with its <code>.discrimination.md</code> recording <code>DISCRIMINATION: skipped — no later_commit supplied</code> — meaning the over-broadness check never ran. Take a capsule whose gate greens the fix and prints the right <code>red_signal</code> at its base SHA, but whose discrimination line reads <em>skipped</em>: the gate may still be sound, yet that one assurance is simply absent, and the capsule says so on its face. That is the discipline the record enforces — it tells you what the pipeline did <em>not</em> check, so you weigh the gap before trusting the gate.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="novel-item">
+      <div class="n">05</div>
+      <div class="body">
+        <h3>One judge to specify, two who must agree to implement</h3>
+        <p>Machines settle facts; judgment is where a model earns its keep — and the design rations it. In specify, a <em>single</em> critic from a second model family rules on the residue and its verdict is anchored to an exact line (<code>^VERDICT: SHIP$</code> / <code>^VERDICT: ITERATE$</code>) so it cannot be faked by chatty prose. In implement the bar is higher: <em>two</em> critics from different families review independently — <em>"Do NOT read the other's file… independence is what makes agreement meaningful"</em> — and the deterministic <code>verdict</code> ships <em>only</em> if both say SHIP. Disagreement is treated as signal, not noise.</p>
+        <p class="pull">"ok=1; [ &quot;$a&quot; = ship ] &amp;&amp; [ &quot;$b&quot; = ship ] &amp;&amp; ok=0"</p>
+      </div>
+    </div>
+
+    <div class="novel-item">
+      <div class="n">06</div>
+      <div class="body">
+        <h3>A loud dead-end for corrupted state</h3>
+        <p>Not every stop is a failure to converge. When a reset cannot be <em>proven</em> — the tree was supposed to return to base and the pipeline cannot show that it did — the run routes to <code>reset_fail</code>: a node with <em>no outgoing edges at all</em>, non-retryable, deliberately loud. <em>"A reset that cannot be proven is a corrupted-state class."</em> It is distinct from a budget-exhausted stop (which writes a postmortem) and from a reasoned human escalation. The system draws a hard line between "this failed to work," "this needs a human," and "the ground under this run is no longer trustworthy — halt now."</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col">
+    <h3>Three incidents, recorded in the graphs</h3>
+    <p>These proofs read as paranoia until you see what they were bought with. The graphs carry their own scar tissue:</p>
+
+    <div class="note hazard">
+      <p class="note-label">The gate nobody executed</p>
+      <p>A capsule PR shipped a <code>verify.sh</code> containing 54 <code>[REDACTED:assignment]</code> markers across 31 lines. The in-run judge approved a gate that <em>ran</em>; a secret-scrubber then rewrote the script before the branch was pushed. <em>"Every CI check on that PR was green, because NOTHING anywhere executes a shipped capsule gate."</em> The fix: a byte-for-byte record/verify fence, and a step that re-runs the <em>shipped</em> bytes from a clean tree — because the proofs are about the script, and the script that arrives must be the script that was proven.</p>
+    </div>
+
+    <div class="note hazard">
+      <p class="note-label">Consensus that quietly became one voice</p>
+      <p>In a real run, the second critic hard-errored on all five attempts (<code>no adapter found for provider 'openai'</code>) and burned the entire budget — despite a gate-green fix sitting right there. A two-family agreement mechanism is only as good as its second family actually being present; when it silently collapses to one, "consensus" is theatre.</p>
+    </div>
+
+    <div class="note hazard">
+      <p class="note-label">The phantom SHIP — stale evidence</p>
+      <p>A prior round's critique file, read as if it were the current round's verdict, ships a fix the current round never actually judged. The engine's per-visit <code>must_write</code> freshness floor is what closes it: a node that promised an artifact this round and did not produce one cannot pass on last round's.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 5. MECHANICS -->
+<section id="mechanics" aria-labelledby="h-mech">
+  <div class="col">
+    <p class="eyebrow"><span class="num">04</span>Under the hood</p>
+    <h2 id="h-mech">Two graphs: one builds the capsule, one spends it</h2>
+    <p class="standfirst">Both stages are Attractor pipelines — DOT graphs where nodes are computation, <code>goal_gate</code> edges are fail-closed, and every worker node that promises an artifact must actually write it. Read them for shape, not size: what matters is the order of the proofs, not the node count.</p>
+
+    <h3>Specify — <code>capsule.dot</code>, the build-and-prove graph</h3>
+    <p>A read-only pipeline: it produces a proven capsule and copies it <em>out</em>, without committing anything. The spine runs authoring first, then a wall of proofs, then a single judgment, then the exit gates.</p>
+  </div>
+
+  <figure>
+    <p class="fig-title">Diagram 3 — the specify pipeline, in proof order</p>
+    <svg class="dg" viewBox="0 0 960 330" role="img" aria-labelledby="d3t d3d" xmlns="http://www.w3.org/2000/svg">
+      <title id="d3t">The shape of capsule.dot</title>
+      <desc id="d3d">setup preflight leads to orient, a gate-blind rival steelman, then author which writes the capsule pair. Then a chain of proof gates: a shape gate, a leak gate, the redgate RED proof, the three hypothesis patch writers feeding a non-vacuity gate, one critic, a verdict, a discrimination check, and finally package. Corrective edges return to author.</desc>
+
+      <!-- row 1: author path -->
+      <text class="cap" x="30" y="52">author</text>
+      <polygon class="n" points="70,64 118,88 70,112 22,88"/>
+      <text class="nl-s" x="70" y="92" text-anchor="middle">setup</text>
+      <rect class="n" x="150" y="66" width="92" height="44" rx="2"/>
+      <text class="nl-s" x="196" y="92" text-anchor="middle">orient</text>
+      <rect class="n" x="274" y="66" width="110" height="44" rx="2"/>
+      <text class="nl-s" x="329" y="87" text-anchor="middle">rival</text>
+      <text class="nl-s" x="329" y="101" text-anchor="middle" style="fill:#a29886">gate-blind</text>
+      <rect class="n" x="416" y="60" width="140" height="56" rx="2"/>
+      <text class="nl" x="486" y="84" text-anchor="middle">author</text>
+      <text class="nl-s" x="486" y="102" text-anchor="middle">writes the pair</text>
+
+      <line class="e" x1="120" y1="88" x2="146" y2="88" marker-end="url(#ar)"/>
+      <line class="e" x1="244" y1="88" x2="270" y2="88" marker-end="url(#ar)"/>
+      <line class="e" x1="386" y1="88" x2="412" y2="88" marker-end="url(#ar)"/>
+
+      <!-- row 2: the proof wall -->
+      <text class="cap" x="30" y="168">prove</text>
+      <polygon class="n-g" points="70,150 190,150 178,196 58,196"/>
+      <text class="nl-s" x="122" y="170" text-anchor="middle">capsule_gate</text>
+      <text class="nl-s" x="122" y="184" text-anchor="middle" style="fill:#a29886">shape wall</text>
+      <polygon class="n-g" points="228,150 330,150 318,196 216,196"/>
+      <text class="nl-s" x="272" y="177" text-anchor="middle">leak_gate</text>
+      <polygon class="n-g" points="368,150 478,150 466,196 356,196"/>
+      <text class="nl-s" x="416" y="170" text-anchor="middle">redgate</text>
+      <text class="nl-s" x="416" y="184" text-anchor="middle" style="fill:#c0400f">RED proof</text>
+
+      <!-- author -> capsule_gate -->
+      <path class="e" d="M 486 118 V 134 H 122 V 146" marker-end="url(#ar)"/>
+      <line class="e-g" x1="192" y1="173" x2="214" y2="173" marker-end="url(#ar-g)"/>
+      <line class="e-g" x1="332" y1="173" x2="354" y2="173" marker-end="url(#ar-g)"/>
+
+      <!-- mutate cluster -->
+      <rect class="n" x="520" y="146" width="150" height="24" rx="2"/>
+      <text class="nl-s" x="595" y="163" text-anchor="middle">mutate (A)</text>
+      <rect class="n" x="520" y="174" width="150" height="24" rx="2"/>
+      <text class="nl-s" x="595" y="191" text-anchor="middle">mutate_b (B)</text>
+      <rect class="n" x="520" y="202" width="150" height="24" rx="2"/>
+      <text class="nl-s" x="595" y="219" text-anchor="middle" style="fill:#c0400f">void (dodge)</text>
+      <line class="e-g" x1="468" y1="173" x2="516" y2="160" marker-end="url(#ar-g)"/>
+
+      <polygon class="n-g" points="710,150 858,150 846,208 698,208"/>
+      <text class="nl-s" x="778" y="175" text-anchor="middle">nonvacuity</text>
+      <text class="nl-s" x="778" y="189" text-anchor="middle">_gate</text>
+      <text class="nl-s" x="778" y="203" text-anchor="middle" style="fill:#a29886">+ void ratchet</text>
+      <line class="e" x1="672" y1="185" x2="694" y2="182" marker-end="url(#ar)"/>
+
+      <!-- row 3: judge + exits -->
+      <text class="cap" x="30" y="272">judge &amp; exit</text>
+      <rect class="n-g" x="150" y="252" width="120" height="48" rx="2"/>
+      <text class="nl" x="210" y="274" text-anchor="middle">critique</text>
+      <text class="nl-s" x="210" y="291" text-anchor="middle">1 judge · 2nd family</text>
+      <polygon class="n-g" points="310,252 410,252 398,300 298,300"/>
+      <text class="nl-s" x="352" y="280" text-anchor="middle">verdict</text>
+      <polygon class="n-g" points="448,252 596,252 584,300 436,300"/>
+      <text class="nl-s" x="512" y="273" text-anchor="middle">discrimination</text>
+      <text class="nl-s" x="512" y="287" text-anchor="middle" style="fill:#a29886">over-broad?</text>
+      <rect class="n" x="636" y="254" width="104" height="44" rx="2"/>
+      <text class="nl-s" x="688" y="280" text-anchor="middle">package</text>
+      <rect class="n" x="770" y="254" width="120" height="44" rx="1"/>
+      <line class="e" x1="770" y1="264" x2="780" y2="254"/>
+      <line class="e" x1="878" y1="254" x2="888" y2="264"/>
+      <line class="e" x1="770" y1="288" x2="780" y2="298"/>
+      <line class="e" x1="878" y1="298" x2="888" y2="288"/>
+      <text class="nl-s" x="830" y="280" text-anchor="middle">done</text>
+
+      <!-- nonvacuity -> critique -->
+      <path class="e-g" d="M 778 210 V 232 H 210 V 250" marker-end="url(#ar-g)"/>
+      <line class="e-g" x1="272" y1="276" x2="296" y2="276" marker-end="url(#ar-g)"/>
+      <line class="e-g" x1="412" y1="276" x2="434" y2="276" marker-end="url(#ar-g)"/>
+      <line class="e-g" x1="598" y1="276" x2="634" y2="276" marker-end="url(#ar-g)"/>
+      <line class="e-g" x1="742" y1="276" x2="768" y2="276" marker-end="url(#ar-g)"/>
+
+      <!-- corrective back-edges to author (schematic) -->
+      <path class="e-a" d="M 352 302 V 318 H 486 V 118" marker-end="url(#ar-a)"/>
+      <text class="el-a" x="470" y="332" text-anchor="middle">iterate / retarget → author</text>
+    </svg>
+    <figcaption>Authoring happens once at <code>author</code>; every corrective edge lands back there. The gates are ordered so the cheapest checks (shape, leaked vocabulary) run before the expensive one (running the gate at the base SHA), and the single <code>critique</code> judge only sees a draft the machines have already vetted. <b>Not shown:</b> the <code>rival</code> steelman runs <em>before</em> the capsule exists, so its fix cannot be tuned to the gate.</figcaption>
+  </figure>
+
+  <div class="col">
+    <div class="note">
+      <p class="note-label">The preflight that fails loud</p>
+      <p>The very first node, <code>setup</code>, is deterministic and does the unglamorous safety work: it checks out the pinned <code>base_sha</code>, excludes the pipeline's own <code>.ai/</code> scratch from the tree so it doesn't trip the dirty-tree guard, scans for whether the subject ships any tests (test-less subjects get a bigger iteration budget), and — the part worth remembering — if a required vendored script is missing it writes the reason to <code>.ai/setup-error.log</code> and returns <code>invalid</code> <em>before any work starts</em>. The missing-vendor failure is loud and early, not a mysterious mid-run collapse.</p>
+    </div>
+
+    <h3>Implement — <code>task-runner.dot</code>, the spend-it graph</h3>
+    <p>Merging the capsule PR is the build signal. Implement takes the capsule and writes real code until the gate is green — and then, and only then, submits it to the two-critic consensus. The handoff is quiet by design: the capsule's <code>.md</code> and <code>.verify.sh</code> are same-stem siblings, so passing the <code>.md</code> path satisfies this graph's "find the DoD script" convention on the first try, with no fallback.</p>
+  </div>
+
+  <figure>
+    <p class="fig-title">Diagram 4 — the implement pipeline: build until green, then earn consensus</p>
+    <svg class="dg" viewBox="0 0 960 300" role="img" aria-labelledby="d4t d4d" xmlns="http://www.w3.org/2000/svg">
+      <title id="d4t">The shape of task-runner.dot</title>
+      <desc id="d4d">setup and orient lead into an attempt/verify convergence loop where a maker writes code and a cheap gate runs the capsule's verify.sh. On green the run enters a sequential consensus: critique A, a forge-stamp guard, critique B from a different family, then a deterministic verdict that ships only if both agree. Then package and a ship check. Non-shipping doors route through salvage so work survives.</desc>
+
+      <!-- loop -->
+      <polygon class="n" points="60,96 108,120 60,144 12,120"/>
+      <text class="nl-s" x="60" y="124" text-anchor="middle">setup</text>
+      <rect class="n" x="138" y="98" width="86" height="44" rx="2"/>
+      <text class="nl-s" x="181" y="124" text-anchor="middle">orient</text>
+      <rect class="n" x="256" y="92" width="150" height="56" rx="2"/>
+      <text class="nl" x="331" y="116" text-anchor="middle">attempt</text>
+      <text class="nl-s" x="331" y="134" text-anchor="middle">writes real code</text>
+      <polygon class="n-g" points="440,92 588,92 576,148 428,148"/>
+      <text class="nl" x="508" y="116" text-anchor="middle">verify</text>
+      <text class="nl-s" x="508" y="134" text-anchor="middle">runs .verify.sh · budget wall</text>
+
+      <line class="e" x1="110" y1="120" x2="134" y2="120" marker-end="url(#ar)"/>
+      <line class="e" x1="226" y1="120" x2="252" y2="120" marker-end="url(#ar)"/>
+      <line class="e" x1="408" y1="120" x2="424" y2="120" marker-end="url(#ar)"/>
+
+      <!-- fail back-edge -->
+      <path class="e-a" d="M 480 150 C 470 210 331 210 331 150" marker-end="url(#ar-a)"/>
+      <text class="el-a" x="405" y="200" text-anchor="middle">not green → triage → attempt</text>
+
+      <!-- consensus -->
+      <text class="cap" x="628" y="70" text-anchor="middle">green → earn consensus (sequential, independent)</text>
+      <rect class="n-g" x="628" y="88" width="92" height="40" rx="2"/>
+      <text class="nl-s" x="674" y="112" text-anchor="middle">critique A</text>
+      <rect class="n-q" x="628" y="136" width="92" height="26" rx="2"/>
+      <text class="nl-s" x="674" y="153" text-anchor="middle" style="fill:#c0400f">stamp_a</text>
+      <rect class="n-g" x="628" y="170" width="92" height="40" rx="2"/>
+      <text class="nl-s" x="674" y="188" text-anchor="middle">critique B</text>
+      <text class="nl-s" x="674" y="202" text-anchor="middle" style="fill:#a29886">other family</text>
+      <line class="e-g" x1="590" y1="118" x2="624" y2="108" marker-end="url(#ar-g)"/>
+      <line class="e" x1="674" y1="128" x2="674" y2="134" marker-end="url(#ar)"/>
+      <line class="e" x1="674" y1="162" x2="674" y2="168" marker-end="url(#ar)"/>
+
+      <polygon class="n-g" points="762,90 872,90 860,138 750,138"/>
+      <text class="nl-s" x="808" y="112" text-anchor="middle">verdict</text>
+      <text class="nl-s" x="808" y="126" text-anchor="middle" style="fill:#a29886">both SHIP?</text>
+      <path class="e-g" d="M 722 190 H 808 V 140" marker-end="url(#ar-g)"/>
+
+      <rect class="n" x="760" y="172" width="112" height="40" rx="2"/>
+      <text class="nl-s" x="816" y="190" text-anchor="middle">package</text>
+      <text class="nl-s" x="816" y="204" text-anchor="middle" style="fill:#a29886">branch + commit</text>
+      <line class="e-g" x1="808" y1="140" x2="812" y2="170" marker-end="url(#ar-g)"/>
+
+      <rect class="n" x="760" y="238" width="112" height="42" rx="1"/>
+      <line class="e" x1="760" y1="248" x2="770" y2="238"/>
+      <line class="e" x1="860" y1="238" x2="870" y2="248"/>
+      <line class="e" x1="760" y1="272" x2="770" y2="282"/>
+      <line class="e" x1="860" y1="282" x2="870" y2="272"/>
+      <text class="nl-s" x="816" y="256" text-anchor="middle">ship_check</text>
+      <text class="nl-s" x="816" y="270" text-anchor="middle" style="fill:#a29886">.ai/ empty · clean</text>
+      <line class="e" x1="816" y1="212" x2="816" y2="236" marker-end="url(#ar)"/>
+
+      <!-- salvage -->
+      <rect class="n-q" x="440" y="238" width="240" height="42" rx="2"/>
+      <text class="nl-s" x="560" y="258" text-anchor="middle">salvage — commit the tree first</text>
+      <text class="nl-s" x="560" y="273" text-anchor="middle" style="fill:#a29886">every non-shipping door routes here</text>
+    </svg>
+    <figcaption>The <code>attempt → verify</code> loop is the convergence: a maker writes code, the cheap deterministic gate runs the <em>capsule's own</em> <code>verify.sh</code>, and the budget is spent per ledger entry so it cannot loop forever. Green does not mean done — it means <em>eligible</em>. Consensus is sequential and independent, guarded by <code>stamp_a</code> (a sha256 snapshot of critique A, so B's round cannot overwrite it), and <code>verdict</code> ships only on unanimous SHIP. <b>Durability:</b> every door that does <em>not</em> ship first routes through <code>salvage</code>, which commits the working tree so a stalled run's product outlives its runner.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 6. RUN-THROUGH -->
+<section id="runthrough" aria-labelledby="h-run">
+  <div class="col">
+    <p class="eyebrow"><span class="num">05</span>A real capsule, end to end</p>
+    <h2 id="h-run">One off-by-one bug, one gate, two stages</h2>
+    <p class="standfirst">This is a representative defect capsule, <code>is_within_upper_bound_exclusion</code>. The bug — <code>is_within(x, low, high)</code> wrongly excludes the upper bound though the range is meant to be inclusive. Watch how the definition of done becomes a script, gets proven, and then gets spent.</p>
+
+    <h3>The DEFINITION — a spec with a machine-checkable header</h3>
+    <p>The <code>.md</code> opens with frontmatter the pipeline enforces mechanically, then a fixed four-section body (<code>## Goal</code>, <code>## Why this matters</code>, <code>## Definition of done</code>, <code>## Non-goals</code>):</p>
+  </div>
+
+  <div class="wide">
+<pre class="wide-code"><code><span class="cm">---</span>
+<span class="at">id</span>: is_within_upper_bound_exclusion
+<span class="at">title</span>: is_within() wrongly excludes the upper bound though the range is inclusive
+<span class="at">red_signal</span>: <span class="rd">FAIL: Upper bound excluded</span>   <span class="cm"># the exact string the RED run must print</span>
+<span class="at">base_sha</span>: 1b60d2a2cb5fca9fe799408da79efc4c23948276
+<span class="at">target_repo</span>: https://github.com/example-org/example-repo
+<span class="at">verify</span>: DEFINITION.verify.sh
+<span class="cm">---</span>
+
+## Definition of done
+  exit <span class="gn">0</span>: Bug is not present (fixed)
+  exit <span class="rd">1</span>: Bug is present (upper bound excluded)
+  exit &#8805;2: Infrastructure problem</code></pre>
+  </div>
+
+  <div class="col">
+    <h3>The gate — a witness that can't be enumerated away</h3>
+    <p>The <code>verify.sh</code> begins <code>set -euo pipefail</code> and tests <em>random</em> inclusive ranges rather than fixed values, so a "fix" that special-cases the one input in the spec cannot pass. The DEFINITION says so out loud: <em>"the script uses runtime-generated random bounds across multiple test cases to prevent value-specific dodges."</em></p>
+  </div>
+
+  <div class="wide">
+<pre class="wide-code"><code><span class="kw">set</span> -euo pipefail
+<span class="cm"># … three random inclusive ranges …</span>
+    low  = random.randint(0, 100)
+    high = low + random.randint(1, 100)
+    upper_result = is_within(high, low, high)
+    <span class="kw">if</span> upper_result is not True:
+        print(f'<span class="rd">FAIL: Upper bound excluded</span>: is_within({high},{low},{high}) '
+              f'returned {upper_result}, expected True')
+        sys.exit(<span class="rd">1</span>)</code></pre>
+  </div>
+
+  <div class="col">
+    <h3>Stage 1 — specify builds and proves it</h3>
+    <ol class="steps">
+      <li>
+        <span class="lbl">setup · preflight</span>
+        <p>Checks out <code>base_sha</code> <code>1b60d2a2…</code>, excludes <code>.ai/</code> from the tree, confirms the vendored leak-scanner is present. Clean tree, valid input — route to <code>orient</code>.</p>
+      </li>
+      <li>
+        <span class="lbl">orient · rival · author</span>
+        <p>A brief is drafted; a <em>gate-blind</em> rival writes a steelman fix of the <em>issue</em> before any gate exists; then <code>author</code> writes the capsule pair — the DEFINITION and the random-range <code>verify.sh</code>.</p>
+      </li>
+      <li>
+        <span class="lbl">capsule_gate · leak_gate</span>
+        <p>Cheap checks first: the pair exists and is non-empty, the script starts <code>set -euo pipefail</code>, the frontmatter carries <code>red_signal</code>/<code>id</code>/<code>title</code>, and no leaked internal vocabulary. Shape OK, vocabulary clean.</p>
+      </li>
+      <li>
+        <span class="lbl">redgate · the RED proof</span>
+        <p>The gate runs at <code>base_sha</code>. It exits <code>1</code> <em>and</em> the log contains <code>FAIL: Upper bound excluded</code>. Both conditions hold, so the red is red for the stated reason. Route to the mutators.</p>
+      </li>
+      <li>
+        <span class="lbl">mutate · mutate_b · void → nonvacuity_gate</span>
+        <p>Two crude, shape-different patches each drive the gate to <code>0</code> — it is reachable and not vacuous. The void probe tries to delete the witness; any greening dodge is archived and re-run against this and every future round.</p>
+      </li>
+      <li>
+        <span class="lbl">critique · verdict</span>
+        <p>One judge from a second model family reads the vetted draft and ends with an anchored <code>VERDICT: SHIP</code>. The deterministic <code>verdict</code> node accepts only that exact line.</p>
+      </li>
+      <li>
+        <span class="lbl">discrimination_check · package</span>
+        <p>Here, no <code>later_commit</code> was supplied, so the over-broadness check is <em>skipped with a written reason</em> — recorded honestly in <code>.discrimination.md</code>. <code>package</code> copies the proven capsule out. A human can now approve it in minutes and merge the capsule PR.</p>
+      </li>
+    </ol>
+
+    <h3>Stage 2 — implement spends it</h3>
+    <ol class="steps">
+      <li>
+        <span class="lbl">setup · orient · attempt</span>
+        <p>The merged capsule's <code>.md</code> path resolves its same-stem <code>.verify.sh</code> on the first try. A maker writes the real fix — making <code>is_within</code> inclusive at the upper bound.</p>
+      </li>
+      <li>
+        <span class="lbl">verify · the convergence loop</span>
+        <p>The cheap gate runs the capsule's own <code>verify.sh</code>. Red on the first pass routes through <code>triage</code> back to <code>attempt</code>, spending one budget unit per ledger entry; green makes the run <em>eligible</em>, not done.</p>
+      </li>
+      <li>
+        <span class="lbl">critique A · stamp_a · critique B</span>
+        <p>Reviewer A judges and writes its verdict; <code>stamp_a</code> snapshots its sha256; reviewer B — a different model family, forbidden from reading A's file — judges independently.</p>
+      </li>
+      <li>
+        <span class="lbl">verdict · package · ship_check</span>
+        <p>Both said SHIP, so the deterministic gate passes. <code>package</code> commits to a <code>task/&lt;id&gt;</code> branch; <code>ship_check</code> asserts the <code>.ai/</code> scratch is gone and the tree is clean. The preserved plumbing opens the fix PR.</p>
+      </li>
+    </ol>
+
+    <div class="note good">
+      <p class="note-label">What the two stages guarantee together</p>
+      <p>Specify guarantees the <em>gate</em> is a good judge — red for the right reason, reachable, not (where checked) over-broad, vocabulary-clean, blessed by an independent critic. Implement guarantees the <em>fix</em> passes that gate <em>and</em> survives two independent critics who must agree. Neither stage lets an LLM's opinion of its own work end the run.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 7. WHEN / NOT -->
+<section id="when" aria-labelledby="h-when">
+  <div class="col">
+    <p class="eyebrow"><span class="num">06</span>What it is — and is not</p>
+    <h2 id="h-when">A gate is only worth as much as its proofs</h2>
+    <p class="standfirst">The capsule is a specific answer to a specific problem: turning an unenforceable "done" into an executable, adversarially-vetted one. Being honest about its edges is part of the design, not a disclaimer bolted on.</p>
+
+    <div class="two">
+      <div class="g">
+        <h4>What a capsule <em>is</em></h4>
+        <p>A falsifiable definition of done: a script whose exit code decides the question, shipped with the evidence that it goes red on the real bug, can be greened, and was judged by an independent critic.</p>
+        <p>A read-only proposal a human approves on the strength of those proofs — then a build loop that must satisfy the gate and a two-family consensus before it commits.</p>
+      </div>
+      <div>
+        <h4>What a capsule is <em>not</em></h4>
+        <p>Not a guarantee the fix is <em>correct</em> — it is a guarantee the fix passes a gate that was itself vetted. A weak or skipped proof (a skipped discrimination check) is a weaker guarantee, and the capsule says so on its face.</p>
+        <p>Not a wiring guide. The GitHub-Actions plumbing that triggers it is deliberately out of scope here; the interesting thing is the artifact and its proofs, not the CI that fires them.</p>
+      </div>
+    </div>
+
+    <h3>Where to be careful</h3>
+    <ol class="qs">
+      <li>
+        <h4>Did the discrimination check actually run?</h4>
+        <p>If <code>.discrimination.md</code> records a skip, the gate was never proven to be non-over-broad. It may still be a fine gate — but that specific assurance is absent, by the capsule's own admission.</p>
+      </li>
+      <li>
+        <h4>Were both critics really independent?</h4>
+        <p>Consensus is only meaningful if the second family was actually present and blind to the first. A silently-degraded critic turns "two agreed" into "one spoke twice."</p>
+      </li>
+      <li>
+        <h4>Is the shipped script the proven script?</h4>
+        <p>The proofs are about bytes. If anything rewrites the gate between proving and shipping, the proofs no longer describe what arrives — which is exactly why the shipped bytes are re-verified from a clean tree.</p>
+      </li>
+    </ol>
+
+    <p class="pull">"Nothing with a measured miss record gets acquittal power over an executed result."</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================================================ 8. FOOTER -->
+<footer>
+  <div class="col">
+    <h2>Sources &amp; provenance</h2>
+    <ul>
+      <li><a href="https://github.com/microsoft/amplifier-bundle-attractor">github.com/microsoft/amplifier-bundle-attractor</a> — the Attractor engine these graphs run on; the capsule pipeline lives under its <code>.github/capsule-pipeline/</code></li>
+      <li><code>capsule.dot</code> (specify) &amp; <code>task-runner.dot</code> (implement) — the two graphs the capsule pipeline is built from</li>
+    </ul>
+    <p class="fine">This page was written from the pipeline's own graphs, DEFINITION and gate files, and the incident notes carried in their headers — the <code>goal=</code> and charter text, the node and gate names, the exit-code contract, the <code>red_signal</code> string, and the recorded incidents are the pipeline's, not the author's. The two <code>.dot</code> files are pinned by a body sha256 so parity against their source is checkable; identifiers and values here are from the commit read at time of writing — verify against the commit you pin.</p>
+    <p class="fine"><b>Two honest limits.</b> The discrimination check is skippable, so a given capsule may not demonstrate the complete three-point proof — read its <code>.discrimination.md</code> to see whether it ran. And this explainer covers the <b>defect</b> capsule; a separate feature/census variant is not shown here. The capsule system is under active repair — treat this as an explainer of the design, not a certification of any given run.</p>
+  </div>
+</footer>
+
+</body>
+</html>
