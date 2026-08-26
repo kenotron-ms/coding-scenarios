@@ -99,6 +99,19 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
 
+      # Web-app scenario lanes verify their UI with a real headless browser
+      # (Playwright). Provision Node + Chromium (and its OS libraries) so a lane's
+      # `npx playwright test` can build, serve, and browser-check the app it wrote.
+      # Without this a UI lane has no automated way to prove the app works, which is
+      # what forced the planner back to an (unattended-fatal) manual check.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright system deps + Chromium
+        run: npx --yes playwright@latest install --with-deps chromium
+
       # GATE 3 — anti-tamper. The compiler is deterministic (same plan -> byte
       # identical .dot), so a recompile that differs means the branch was edited.
       - name: Verify plan integrity
