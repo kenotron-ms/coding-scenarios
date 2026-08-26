@@ -82,7 +82,7 @@ pip install -r framework/harness/requirements.txt
 
 python3 framework/harness/run_scenario.py \
   --scenario scenarios/L1-csv-parser \
-  --solution scenarios/L1-csv-parser/reference/solution \
+  --solution graders/references/L1-csv-parser/solution \
   --strategy my-strategy@v1 \
   --out runs/$(date +%Y%m%d-%H%M%S)/L1/
 # -> gate PASS · score 98 · Converged-Clean; score.json written to the out dir

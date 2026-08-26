@@ -3,8 +3,8 @@
 The machine-readable grader is `rubric.yaml`; this is its readable companion.
 See `framework/GRADING.md` for the contract and `framework/HARNESS.md` for how
 to run it. This scenario's grader is proven the same way `L0-roman-numerals`
-is: it passes on `reference/solution/` (gate PASS, high score) and fails on
-`reference/solution_broken/` (gate FAIL, `acceptance_pass < 1.0`).
+is: it passes on `graders/references/L2-lru-cache/solution/` (gate PASS, high score) and fails on
+`graders/references/L2-lru-cache/solution_broken/` (gate FAIL, `acceptance_pass < 1.0`).
 
 ## How to run it
 

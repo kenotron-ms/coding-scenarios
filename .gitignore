@@ -62,7 +62,8 @@ telemetry.json
 # Test/cache artifacts produced while running graders locally
 .pytest_cache/
 .hypothesis/
-!scenarios/**/reference/**        # keep reference solutions
+!graders/references/**            # keep reference solutions (moved from scenario tree)
+!scenarios/**/reference/**        # keep reference solutions (legacy — no longer populated)
 
 # goal-batch run markers (lane signals, not artifacts)
 DONE.json

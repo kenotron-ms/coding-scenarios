@@ -2,9 +2,9 @@
 
 The machine-readable grader is `rubric.yaml`; this is its readable companion.
 See `framework/GRADING.md` for the contract and `framework/HARNESS.md` for how
-to run it. Its grader passes on `reference/solution/` (gate PASS, high score)
-and fails on both `reference/solution_broken/` (acceptance < 1.0) and
-`reference/solution_csvlib/` (acceptance may be 1.0, but the `import csv`
+to run it. Its grader passes on `graders/references/L1-csv-parser/solution/` (gate PASS, high score)
+and fails on both `graders/references/L1-csv-parser/solution_broken/` (acceptance < 1.0) and
+`graders/references/L1-csv-parser/solution_csvlib/` (acceptance may be 1.0, but the `import csv`
 probe fails the gate) — proving the grader discriminates on *both* dimensions
 the scenario cares about: correctness and the stdlib-`csv`-forbidden
 constraint.
@@ -70,7 +70,7 @@ verbatim from REQUIREMENTS.md §6.1.
 csv`) statically scans every `*.py` file in the solution for `import csv` /
 `from csv import ...`; a hit fails the probe and therefore the gate,
 **regardless of acceptance_pass** (REQUIREMENTS.md §2.4, §7.3). This is
-proven by `reference/solution_csvlib/`: a behaviorally-correct parser built
+proven by `graders/references/L1-csv-parser/solution_csvlib/`: a behaviorally-correct parser built
 on `csv.reader` that passes acceptance but still fails the gate.
 
 ## Judge (QUA)

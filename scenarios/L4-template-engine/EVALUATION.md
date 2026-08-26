@@ -2,8 +2,8 @@
 
 The machine-readable grader is `rubric.yaml`; this is its readable companion.
 See `framework/GRADING.md` for the contract and `framework/HARNESS.md` for how to
-run it. The grader passes on `reference/solution/` (gate PASS: 100% acceptance)
-and fails on `reference/solution_broken/` (an interpolation-only mutant whose
+run it. The grader passes on `graders/references/L4-template-engine/solution/` (gate PASS: 100% acceptance)
+and fails on `graders/references/L4-template-engine/solution_broken/` (an interpolation-only mutant whose
 acceptance falls far below the 0.95 floor) — proving it discriminates on the
 dimension the scenario cares about: a real tokenizer→parser→renderer engine, not
 a regex substituter (HARNESS.md §5).
@@ -13,7 +13,7 @@ a regex substituter (HARNESS.md §5).
 ```
 python framework/harness/run_scenario.py \
     --scenario scenarios/L4-template-engine \
-    --solution scenarios/L4-template-engine/reference/solution \
+    --solution graders/references/L4-template-engine/solution \
     [--telemetry telemetry.json] --strategy <name> \
     --out runs/<datetime>/L4/
 ```
