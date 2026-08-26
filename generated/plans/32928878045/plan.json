@@ -1,0 +1,39 @@
+{
+  "plan_id": "issue_11",
+  "description": "Implement the L3 log-analyzer CLI solution under scenarios/L3-log-analyzer/solution/ so that the acceptance gate (acceptance_pass >= 0.95) passes. Single lane: implement the full loganalyze package (parse, aggregate, render, cli, __main__) plus the required design/ artifacts.",
+  "lanes": {
+    "implement_loganalyze": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32928878045/goals/implement_loganalyze.goal.md",
+      "verifier_argv": [
+        "pytest",
+        "scenarios/L3-log-analyzer/tests/smoke",
+        "-q",
+        "--tb=short"
+      ],
+      "marker_file": "artifacts/implement_loganalyze.done",
+      "marker_content": "implement_loganalyze:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    }
+  ],
+  "integration_order": [
+    "implement_loganalyze"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
