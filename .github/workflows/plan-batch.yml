@@ -5,12 +5,12 @@
 # issue as the goal, which converges on a compiler-valid `plan.json`. The workflow
 # then deterministically compiles that plan to its parent `.dot`, renders it to
 # Mermaid, commits all three to a disposable `plan-batch/issue-<n>-<run>` branch,
-# and posts the plan back to the issue for review. Approving it (`/ship-it` or the
-# `ship-it` label) is handled by ship-it.yml.
+# and posts the plan back to the issue for review. Approving it (`/execute-plan` or the
+# `execute-plan` label) is handled by execute-plan.yml.
 #
 # SECURITY: triggers on `issues` (never `pull_request_target`). The pipeline only
 # READS the issue and PLANS; nothing executes here. The plan is executed only after
-# an explicit human approval in ship-it.yml.
+# an explicit human approval in execute-plan.yml.
 #
 # Prerequisites (see the PR description / README): this workflow only fires from the
 # DEFAULT branch, and needs the `compiler/`, `scripts/`, and `pipelines/plan-batch/`
@@ -102,22 +102,22 @@ jobs:
       #    lane's goal_condition_file to its committed ABSOLUTE path, then compile
       #    (deterministic) and render Mermaid (deterministic).
       #
-      #    WHY ABSOLUTE (verified against ship-it.yml + the goal_plan compiler):
+      #    WHY ABSOLUTE (verified against execute-plan.yml + the goal_plan compiler):
       #    at execution time each lane runs the real-work brick
-      #    subgraphs/goal_lane_impl.dot inside its OWN git worktree, which ship-it
+      #    subgraphs/goal_lane_impl.dot inside its OWN git worktree, which execute-plan
       #    forks from origin/main (it passes product_base_sha=origin/main). A goal
       #    file committed to THIS disposable plan branch is therefore NOT present
       #    in that worktree, so a repo-relative goal_condition_file would be
       #    unreadable by the lane. What IS readable is the plan-branch checkout,
-      #    which ship-it lays down at $GITHUB_WORKSPACE and which persists there
+      #    which execute-plan lays down at $GITHUB_WORKSPACE and which persists there
       #    for the whole run; that path is the same deterministic
       #    /home/runner/work/<repo>/<repo> on the GitHub-hosted runner in BOTH
       #    workflows. So we bake the absolute $GITHUB_WORKSPACE/<outdir>/goals/...
       #    path into plan.json here. The compiler is deterministic on the
-      #    committed plan.json, so ship-it's anti-tamper recompile still matches
+      #    committed plan.json, so execute-plan's anti-tamper recompile still matches
       #    byte-for-byte. (Assumption: GitHub-hosted ubuntu runner; a self-hosted
       #    runner with a different $GITHUB_WORKSPACE would need this rewrite, or
-      #    ship-it's product_base_sha, revisited.)
+      #    execute-plan's product_base_sha, revisited.)
       - name: Relocate, rewrite goal paths, compile and render
         if: steps.gate.outputs.no_plan == 'false'
         run: |
@@ -162,7 +162,7 @@ jobs:
           python3 scripts/dot_to_mermaid.py "$OUTDIR/goal_plan.dot" -o "$OUTDIR/plan.mmd"
 
       # 4. Commit the artifacts to a disposable branch — this is the hand-off
-      #    channel to ship-it.yml (SHA-pinned, auditable).
+      #    channel to execute-plan.yml (SHA-pinned, auditable).
       - name: Commit plan branch
         if: steps.gate.outputs.no_plan == 'false'
         run: |
@@ -211,7 +211,7 @@ jobs:
               `Compiled pipeline: [\`${outdir}/goal_plan.dot\`](${dotUrl})`,
               '',
               '---',
-              '✅ **To execute this plan:** comment `/ship-it` **or** add the `ship-it` label',
+              '✅ **To execute this plan:** comment `/execute-plan` **or** add the `execute-plan` label',
               '(requires write access; a maintainer must also approve the `batch-execute`',
               'environment).',
             ].join('\n');

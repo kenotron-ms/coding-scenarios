@@ -1,8 +1,8 @@
-# Ship It — execute an approved batch plan on the runner.
+# Execute Plan — execute an approved batch plan on the runner.
 #
 # Trigger (BOTH accepted):
-#   - a comment beginning `/ship-it` on the issue, OR
-#   - adding the `ship-it` label to the issue.
+#   - a comment beginning `/execute-plan` on the issue, OR
+#   - adding the `execute-plan` label to the issue.
 # In either case the actor must have write access, AND the `batch-execute`
 # GitHub Environment (configured with required reviewers) must be approved.
 #
@@ -17,7 +17,7 @@
 # (3) the anti-tamper recompile rejects any hand-edited branch. `issue_comment`
 # runs in the base-branch context with write perms, so gate (1) is mandatory.
 
-name: Ship It
+name: Execute Plan
 
 on:
   issue_comment:
@@ -31,18 +31,18 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ship-it-${{ github.event.issue.number }}
+  group: execute-plan-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   execute:
-    # Real issues only (not PR comments); /ship-it comment OR ship-it label.
+    # Real issues only (not PR comments); /execute-plan comment OR execute-plan label.
     if: >-
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request == null &&
-       startsWith(github.event.comment.body, '/ship-it')) ||
+       startsWith(github.event.comment.body, '/execute-plan')) ||
       (github.event_name == 'issues' &&
-       github.event.label.name == 'ship-it')
+       github.event.label.name == 'execute-plan')
     runs-on: ubuntu-latest
     environment: batch-execute # required-reviewer gate — human approval before any execution
     steps:
