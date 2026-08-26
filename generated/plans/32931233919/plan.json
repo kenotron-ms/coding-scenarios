@@ -1,0 +1,88 @@
+{
+  "plan_id": "issue_16",
+  "description": "L8 Markdown vault editor (Tauri + SSH): implement the full scenario solution per scenarios/L8-markdown-editor/REQUIREMENTS.md. Decomposed into design artifacts, Rust/Tauri SSH core, TypeScript WYSIWYM frontend, and a final integration+build lane.",
+  "lanes": {
+    "lane_design_docs": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931233919/goals/lane_design_docs.goal.md",
+      "verifier_argv": [
+        "/bin/sh",
+        "-c",
+        "test -f scenarios/L8-markdown-editor/design/security-model.md && test -f scenarios/L8-markdown-editor/design/performance-budget.md && test -f scenarios/L8-markdown-editor/design/personas.md && test -f scenarios/L8-markdown-editor/design/prd.md && test -f scenarios/L8-markdown-editor/design/interaction-specs.md && test -f scenarios/L8-markdown-editor/design/a11y-annotations.md && test -f scenarios/L8-markdown-editor/design/backlog.md"
+      ],
+      "marker_file": "artifacts/lane_design_docs.done",
+      "marker_content": "lane_design_docs:ok"
+    },
+    "lane_rust_core": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931233919/goals/lane_rust_core.goal.md",
+      "verifier_argv": [
+        "/bin/sh",
+        "-c",
+        "test -f scenarios/L8-markdown-editor/src-tauri/src/main.rs && test -f scenarios/L8-markdown-editor/src-tauri/Cargo.toml && grep -q 'list_hosts' scenarios/L8-markdown-editor/src-tauri/src/main.rs && grep -q 'verify_host_key' scenarios/L8-markdown-editor/src-tauri/src/main.rs && grep -q 'write_file' scenarios/L8-markdown-editor/src-tauri/src/main.rs"
+      ],
+      "marker_file": "artifacts/lane_rust_core.done",
+      "marker_content": "lane_rust_core:ok"
+    },
+    "lane_editor_frontend": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931233919/goals/lane_editor_frontend.goal.md",
+      "verifier_argv": [
+        "/bin/sh",
+        "-c",
+        "test -f scenarios/L8-markdown-editor/src/main.ts && test -f scenarios/L8-markdown-editor/src/editor/document-model.ts && test -f scenarios/L8-markdown-editor/src/ipc/client.ts && test -f scenarios/L8-markdown-editor/package.json"
+      ],
+      "marker_file": "artifacts/lane_editor_frontend.done",
+      "marker_content": "lane_editor_frontend:ok"
+    },
+    "lane_integration": {
+      "wave": 2,
+      "depends_on": [
+        "lane_design_docs",
+        "lane_rust_core",
+        "lane_editor_frontend"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931233919/goals/lane_integration.goal.md",
+      "verifier_argv": [
+        "/bin/sh",
+        "-c",
+        "test -f scenarios/L8-markdown-editor/manifest.yaml && test -f scenarios/L8-markdown-editor/tauri.conf.json && grep -q 'build' scenarios/L8-markdown-editor/manifest.yaml && test -f scenarios/L8-markdown-editor/fixtures/sshd/sshd_config && test -f scenarios/L8-markdown-editor/fixtures/vault/README.md"
+      ],
+      "marker_file": "artifacts/lane_integration.done",
+      "marker_content": "lane_integration:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1,
+      "concurrency": 3
+    },
+    {
+      "wave": 2
+    }
+  ],
+  "integration_order": [
+    "lane_design_docs",
+    "lane_rust_core",
+    "lane_editor_frontend",
+    "lane_integration"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
