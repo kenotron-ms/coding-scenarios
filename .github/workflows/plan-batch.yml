@@ -1,20 +1,24 @@
 # Plan Batch — issue → compiler-accepted plan.json → reviewable Mermaid on the issue.
 #
-# Flow: a maintainer adds the `plan-batch` label to an issue. This workflow runs
-# the `plan-batch` PLANNER attractor (pipelines/plan-batch/plan-batch.dot) with the
-# issue as the goal, which converges on a compiler-valid `plan.json`. The workflow
-# then deterministically compiles that plan to its parent `.dot`, renders it to
-# Mermaid, commits all three to a disposable `plan-batch/issue-<n>-<run>` branch,
-# and posts the plan back to the issue for review. Approving it (`/execute-plan` or the
+# Flow: a maintainer adds the `plan-batch` label to an issue. This workflow
+# delegates to attractor-pipelines' goal-plan/prepare composite action (a
+# reusable action referenced here by pinned commit SHA), which runs the
+# `plan-batch` PLANNER attractor with the issue as the goal, converges on a
+# compiler-valid `plan.json`, deterministically compiles it to its parent
+# `.dot`, renders it to Mermaid, and commits all three to a disposable
+# `plan-batch/issue-<n>-<run>` branch. This workflow then posts the plan back
+# to the issue for review. Approving it (`/execute-plan` or the
 # `execute-plan` label) is handled by execute-plan.yml.
 #
 # SECURITY: triggers on `issues` (never `pull_request_target`). The pipeline only
 # READS the issue and PLANS; nothing executes here. The plan is executed only after
 # an explicit human approval in execute-plan.yml.
 #
-# Prerequisites (see the PR description / README): this workflow only fires from the
-# DEFAULT branch, and needs the `compiler/`, `scripts/`, and `pipelines/plan-batch/`
-# trees plus the `ANTHROPIC_API_KEY` secret to be present on that branch.
+# Prerequisites: this workflow only fires from the DEFAULT branch, and needs the
+# `ANTHROPIC_API_KEY` secret to be present on that branch. All engine assets
+# (the plan compiler, the planner attractor, and the render/relocate logic)
+# are supplied by the pinned attractor-pipelines goal-plan/prepare action from
+# its own checkout — this repo does not vendor any of them.
 
 name: Plan Batch
 
@@ -41,49 +45,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute run id and branch
-        id: ids
-        run: |
-          RUN_ID="${{ github.run_id }}"
-          BRANCH="plan-batch/issue-${{ github.event.issue.number }}-${RUN_ID}"
-          OUTDIR="generated/plans/${RUN_ID}"
-          {
-            echo "run_id=${RUN_ID}"
-            echo "branch=${BRANCH}"
-            echo "outdir=${OUTDIR}"
-          } >> "$GITHUB_OUTPUT"
-
-      # 1. Author plan.json from the issue. amplifier-app-actions sets $goal to the
-      #    issue context block; the pipeline converges on a compiler-valid plan.json
-      #    written to the workspace root (or aborts, leaving plan-batch-residual.md).
-      - name: Author plan.json (planner attractor)
-        uses: microsoft/amplifier-app-actions@main
+      # Everything else (planner, compiler-validity gate, goal-file gate,
+      # relocate/rewrite/compile/render, commit + push the plan branch) lives
+      # in attractor-pipelines' goal-plan/prepare action, referenced here by
+      # pinned commit SHA.
+      - name: Prepare goal-plan
+        id: plan
+        uses: kenotron-ms/attractor-pipelines/.github/actions/goal-plan/prepare@83776af
         with:
-          attractor_source: pipelines/plan-batch/plan-batch.dot
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ github.token }}
-
-      # 2. Gate on the ARTIFACT, not the job status (per plan-batch.md output
-      #    contract): on abort the pipeline deliberately removes plan.json.
-      - name: Check planner produced a plan
-        id: gate
-        run: |
-          if [ ! -f plan.json ]; then
-            echo "no_plan=true" >> "$GITHUB_OUTPUT"
-            echo "Planner did not produce a compiler-valid plan.json." >&2
-            exit 0
-          fi
-          echo "no_plan=false" >> "$GITHUB_OUTPUT"
+          issue_number: ${{ github.event.issue.number }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
 
       - name: Report planning failure to issue
-        if: steps.gate.outputs.no_plan == 'true'
+        if: steps.plan.outputs.plan_produced == 'false'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             let residual = '_No residual note was produced._';
-            try { residual = fs.readFileSync('plan-batch-residual.md', 'utf8'); } catch {}
+            try { residual = fs.readFileSync('${{ steps.plan.outputs.residual_path }}', 'utf8'); } catch {}
             const body = [
               '### ⚠️ plan-batch could not produce a valid plan',
               '',
@@ -98,99 +79,21 @@ jobs:
               ...context.repo, issue_number: context.issue.number, body });
             core.setFailed('planner produced no plan.json');
 
-      # 3. Relocate the plan AND the per-lane goal-condition files, rewrite each
-      #    lane's goal_condition_file to its committed ABSOLUTE path, then compile
-      #    (deterministic) and render Mermaid (deterministic).
-      #
-      #    WHY ABSOLUTE (verified against execute-plan.yml + the goal_plan compiler):
-      #    at execution time each lane runs the real-work brick
-      #    subgraphs/goal_lane_impl.dot inside its OWN git worktree, which execute-plan
-      #    forks from origin/main (it passes product_base_sha=origin/main). A goal
-      #    file committed to THIS disposable plan branch is therefore NOT present
-      #    in that worktree, so a repo-relative goal_condition_file would be
-      #    unreadable by the lane. What IS readable is the plan-branch checkout,
-      #    which execute-plan lays down at $GITHUB_WORKSPACE and which persists there
-      #    for the whole run; that path is the same deterministic
-      #    /home/runner/work/<repo>/<repo> on the GitHub-hosted runner in BOTH
-      #    workflows. So we bake the absolute $GITHUB_WORKSPACE/<outdir>/goals/...
-      #    path into plan.json here. The compiler is deterministic on the
-      #    committed plan.json, so execute-plan's anti-tamper recompile still matches
-      #    byte-for-byte. (Assumption: GitHub-hosted ubuntu runner; a self-hosted
-      #    runner with a different $GITHUB_WORKSPACE would need this rewrite, or
-      #    execute-plan's product_base_sha, revisited.)
-      - name: Relocate, rewrite goal paths, compile and render
-        if: steps.gate.outputs.no_plan == 'false'
-        run: |
-          set -euo pipefail
-          OUTDIR="${{ steps.ids.outputs.outdir }}"
-          mkdir -p "$OUTDIR/goals"
-          mv plan.json "$OUTDIR/plan.json"
-          # The planner staged one goal-condition file per lane at the workspace
-          # root (the pipeline's InstallGoals gate asserted every one is present
-          # and non-empty before it produced plan.json). Move them under OUTDIR so
-          # they are committed to the plan branch alongside plan.json.
-          if [ -d plan-batch-goals ]; then
-            cp plan-batch-goals/*.goal.md "$OUTDIR/goals/" 2>/dev/null || true
-          fi
-          # Rewrite every lane's goal_condition_file -> committed ABSOLUTE path,
-          # failing loud if any lane's goal file is missing/empty on disk.
-          python3 - "$OUTDIR/plan.json" "$GITHUB_WORKSPACE" "$OUTDIR" <<'PY'
-          import json, os, sys
-          plan_path, ws, outdir = sys.argv[1], sys.argv[2], sys.argv[3]
-          plan = json.load(open(plan_path))
-          goals_rel = os.path.join(outdir, "goals")
-          missing = []
-          for lid, lane in plan.get("lanes", {}).items():
-              gcf = lane.get("goal_condition_file")
-              if not gcf:
-                  missing.append(lid + " (no goal_condition_file)")
-                  continue
-              base = os.path.basename(gcf)
-              disk = os.path.join(goals_rel, base)
-              if not (os.path.isfile(disk) and os.path.getsize(disk) > 0):
-                  missing.append(lid + " (" + base + " missing/empty)")
-                  continue
-              lane["goal_condition_file"] = os.path.join(ws, goals_rel, base)
-          if missing:
-              sys.stderr.write("::error::goal files missing at compile time: " + ", ".join(missing) + "\n")
-              sys.exit(1)
-          json.dump(plan, open(plan_path, "w"), indent=2)
-          print("rewrote %d lane goal_condition_file path(s) to absolute" % len(plan["lanes"]))
-          PY
-          rm -rf plan-batch-goals
-          python3 -m compiler "$OUTDIR/plan.json" -o "$OUTDIR/goal_plan.dot"
-          python3 scripts/dot_to_mermaid.py "$OUTDIR/goal_plan.dot" -o "$OUTDIR/plan.mmd"
-
-      # 4. Commit the artifacts to a disposable branch — this is the hand-off
-      #    channel to execute-plan.yml (SHA-pinned, auditable).
-      - name: Commit plan branch
-        if: steps.gate.outputs.no_plan == 'false'
-        run: |
-          set -euo pipefail
-          git switch -c "${{ steps.ids.outputs.branch }}"
-          git add "${{ steps.ids.outputs.outdir }}"
-          git \
-            -c user.name='amplifier-bot' \
-            -c user.email='240397093+microsoft-amplifier@users.noreply.github.com' \
-            commit -m "plan-batch: issue #${{ github.event.issue.number }} (${{ steps.ids.outputs.run_id }})"
-          git push --force-with-lease -u origin "${{ steps.ids.outputs.branch }}"
-
-      # 5. Post the plan for human review. Mermaid + plan.json are inlined;
-      #    the (large) compiled .dot is linked on the branch to stay under the
-      #    65 536-char comment limit.
+      # Post the plan for human review. Mermaid + plan.json are inlined;
+      # the (large) compiled .dot is linked on the branch to stay under the
+      # 65 536-char comment limit.
       - name: Post plan for review
-        if: steps.gate.outputs.no_plan == 'false'
+        if: steps.plan.outputs.plan_produced == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const outdir = '${{ steps.ids.outputs.outdir }}';
-            const branch = '${{ steps.ids.outputs.branch }}';
-            const runId = '${{ steps.ids.outputs.run_id }}';
-            const mermaid = fs.readFileSync(`${outdir}/plan.mmd`, 'utf8');
-            const plan = fs.readFileSync(`${outdir}/plan.json`, 'utf8');
-            const repo = `${context.repo.owner}/${context.repo.repo}`;
-            const dotUrl = `../blob/${branch}/${outdir}/goal_plan.dot`;
+            const branch = '${{ steps.plan.outputs.plan_branch }}';
+            const parentDotPath = '${{ steps.plan.outputs.parent_dot_path }}';
+            const mermaid = fs.readFileSync('${{ steps.plan.outputs.mermaid_path }}', 'utf8');
+            const plan = fs.readFileSync('${{ steps.plan.outputs.plan_json_path }}', 'utf8');
+            const runId = '${{ github.run_id }}';
+            const dotUrl = `../blob/${branch}/${parentDotPath}`;
             const clip = (s, n) => (s.length > n ? s.slice(0, n) + '\n… (truncated — see branch)' : s);
             const body = [
               `### 📋 Proposed batch plan — \`${runId}\``,
@@ -208,7 +111,7 @@ jobs:
               '',
               '</details>',
               '',
-              `Compiled pipeline: [\`${outdir}/goal_plan.dot\`](${dotUrl})`,
+              `Compiled pipeline: [\`${parentDotPath}\`](${dotUrl})`,
               '',
               '---',
               '✅ **To execute this plan:** comment `/execute-plan` **or** add the `execute-plan` label',
