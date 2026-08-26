@@ -1,0 +1,40 @@
+{
+  "plan_id": "issue_9",
+  "description": "Implement the L1 CSV parser scenario solution: a pure RFC 4180-subset CSV parser (quoted fields, escaped quotes, embedded delimiters/newlines) under scenarios/L1-csv-parser/solution/csvparse.py using stdlib only, passing the acceptance suite at 100% with no csv module import.",
+  "lanes": {
+    "csv_parser_impl": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32927203707/goals/csv_parser_impl.goal.md",
+      "verifier_argv": [
+        "pytest",
+        "scenarios/L1-csv-parser/tests/acceptance",
+        "scenarios/L1-csv-parser/tests/smoke",
+        "-q",
+        "--tb=short"
+      ],
+      "marker_file": "artifacts/csv_parser_impl.done",
+      "marker_content": "csv_parser_impl:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    }
+  ],
+  "integration_order": [
+    "csv_parser_impl"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
