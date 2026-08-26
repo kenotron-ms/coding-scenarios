@@ -1,0 +1,190 @@
+// deliver_pr.dot (goal_plan_smoke family)
+//
+// Adapted from this repo's proven subgraphs/deliver_pr.dot pattern (see
+// pipelines/idea_to_shipped/subgraphs/deliver_pr.dot and RUBRIC.md \u00a75
+// reuse discipline). Differences from the proven pattern, all required by
+// design doc Task 9 -- and the clean-delivery build that closes this file's
+// original doc-vs-reality gap:
+//   - The delivered commit is BUILT HERE in a fresh, disposable worktree
+//     based at $product_base_sha (origin/main), populated with ONLY the real
+//     product paths taken from $final_head's tree (see BuildCleanDelivery).
+//     Earlier revisions of this header claimed "the parent creates a clean
+//     worktree at the frozen final HEAD" -- it never did: the parent's
+//     Deliver node is a bare folder node, so this subgraph ran in the
+//     plan-branch checkout and pushed that commit verbatim, delivering lane
+//     bookkeeping (.goal_lane_impl_*, .goal_lane_iteration), the load-bearing
+//     markers (artifacts/*.done), and the plan machinery (generated/plans/**)
+//     alongside the real work. This graph now builds its OWN clean worktree,
+//     so the delivered diff vs main is exactly the product the lanes created.
+//   - all generated delivery state (push status, claimed PR url, the clean
+//     worktree) is written OUTSIDE the delivered tree under
+//     $delivery_state_root, never committed;
+//   - the branch name and remote are compile-bound inputs from the parent
+//     ($delivery_branch, $repo), never invented by the LLM node;
+//   - push is explicitly non-force (never --force / --force-with-lease);
+//   - independent verification (CheckPROpened) additionally confirms the
+//     PR's head SHA equals the CLEAN delivered commit, not just that a PR
+//     exists.
+//
+// THE MACHINERY DENYLIST (single source of truth -- encoded in BuildCleanDelivery):
+// product paths = git diff --name-only $product_base_sha $final_head, MINUS
+//   * .goal_lane*              -- lane brick bookkeeping (status/verdict/
+//                                 iteration/feedback/failure-signatures/postmortem)
+//   * artifacts/*.done         -- lane completion markers. LOAD-BEARING: the
+//                                 parent gates (PreCoherenceAggregate,
+//                                 FinalAggregateAfterSweep, FinalFreeze) test
+//                                 -f these in the integration tree, so they
+//                                 MUST stay there -- they are only filtered
+//                                 out of the DELIVERED tree, never deleted
+//                                 from the run.
+//   * generated/plans/*        -- plan-branch machinery (plan.json, goal_plan.dot,
+//                                 plan.mmd, goals/*.goal.md)
+//
+// Required context ($param) -- all present in this subgraph because the parent
+// Deliver folder node clones the full parent context (verified):
+//   $repo               - owner/name to open the PR against
+//   $target_repo        - the integration repo (its .git hosts the delivery
+//                         worktree; = $GITHUB_WORKSPACE on CI)
+//   $product_base_sha    - base commit the delivered branch forks from (main)
+//   $delivery_branch     - branch name (resolved by ResolveDelivery)
+//   $final_head          - the frozen integrated HEAD (resolved by ResolveDelivery);
+//                         after BuildCleanDelivery it is REBOUND to the clean
+//                         delivered commit, so the exact-head PR proof checks it
+//   $delivery_state_root - external dir for all generated delivery state + the
+//                         disposable clean worktree
+//   $git_bin             - git argv prefix (single token); defaults to "git"
+//   $run_id / $state_root - used by ResolveDelivery
+//
+// Context outputs: delivery.pr_url, delivery.result ("opened"|"failed")
+
+digraph deliver_pr {
+  graph [rankdir=LR, default_max_retry=2, default_fidelity="summary:high"];
+
+  Start [shape=Mdiamond, label="Start"];
+  Exit  [shape=Msquare,  label="Exit"];
+
+  // Deterministic bridge: pull the two parent-produced facts this subgraph
+  // needs into its OWN context. The compiled goal_plan parent does NOT emit
+  // them as context ($param): it only writes final_head to a file and binds
+  // no delivery branch. $state_root and $run_id ARE in context (the folder
+  // node clones the full parent context). Fail-closed: a missing final_head
+  // file => empty => a real head_mismatch downstream, never a false pass.
+  ResolveDelivery [
+    shape=parallelogram, label="Resolve final_head + delivery_branch",
+    tool_command="#!/bin/sh\nfh=\"$final_head\"\nif [ -z \"$fh\" ]; then fh=$(cat \"$state_root/final_head.txt\" 2>/dev/null); fi\nbr=\"$delivery_branch\"\nif [ -z \"$br\" ]; then rid=\"$run_id\"; if [ -z \"$rid\" ]; then rid=$(date +%s); fi; br=\"goal-plan-delivery/$rid\"; fi\ngit config user.email >/dev/null 2>&1 || git config user.email \"amplifier-bot@users.noreply.github.com\" >/dev/null 2>&1 || true\ngit config user.name >/dev/null 2>&1 || git config user.name \"amplifier-bot\" >/dev/null 2>&1 || true\nprintf '{\"final_head\": \"%s\", \"delivery_branch\": \"%s\"}' \"$fh\" \"$br\"",
+    parse_json="true"
+  ];
+  Start -> ResolveDelivery;
+  ResolveDelivery -> ConfirmHead;
+
+  // Pre-flight: confirm the integration checkout (this subgraph's cwd =
+  // $target_repo) is actually sitting on the frozen integrated HEAD before we
+  // build/deliver anything (design doc Task 9 step 3: reject stale state).
+  ConfirmHead [
+    shape=parallelogram, label="Confirm Final HEAD",
+    tool_command="#!/bin/sh\nset -e\ncur=$(git rev-parse HEAD)\nif [ \"$cur\" = \"$final_head\" ]; then printf 'head_ok'; else printf 'head_mismatch'; fi"
+  ];
+  ConfirmHead -> BuildCleanDelivery [condition="context.tool.last_line=head_ok", weight="2"];
+  ConfirmHead -> Failed             [condition="context.tool.last_line=head_mismatch"];
+
+  // ---------------------------------------------------------------------
+  // CLEAN-DELIVERY BUILD (the fix; single source of the denylist).
+  //
+  // Build the delivered commit in a FRESH disposable worktree based at
+  // $product_base_sha (main), populated with ONLY the real product paths from
+  // $final_head's tree. Product paths = changed(base..final_head) MINUS the
+  // machinery denylist documented in the file header (.goal_lane*,
+  // artifacts/*.done, generated/plans/*). Staging is by EXPLICIT path (never
+  // `git add -A` of the whole tree), so nothing outside the product set can
+  // leak in. The markers stay in the integration tree for the parent gates;
+  // they are only excluded from THIS delivered tree.
+  //
+  // On success it REBINDS $final_head (via parse_json in LoadCleanRefs) to the
+  // new clean commit SHA and exports $delivery_worktree for the push, so the
+  // downstream exact-head PR proof (CheckPROpened) verifies the delivered
+  // commit. Routes: built -> LoadCleanRefs; no_product_paths / build_failed /
+  // hard-crash -> Failed (RUBRIC.md 2/3.2 -- differentiated, no dead-ends).
+  // ---------------------------------------------------------------------
+  BuildCleanDelivery [
+    shape=parallelogram, label="Build Clean Delivery Commit (product-only)",
+    tool_command="#!/bin/sh\nGIT=\"${git_bin:-git}\"\nTR=\"$target_repo\"\nBASE=\"$product_base_sha\"\nFH=\"$final_head\"\nBR=\"$delivery_branch\"\nDSR=\"$delivery_state_root\"\nif [ -z \"$TR\" ] || [ -z \"$BASE\" ] || [ -z \"$FH\" ] || [ -z \"$BR\" ] || [ -z \"$DSR\" ]; then printf 'build_failed'; exit 0; fi\nWT=\"$DSR/delivery-worktree\"\n\"$GIT\" -C \"$TR\" worktree remove --force \"$WT\" 2>/dev/null || true\nrm -rf \"$WT\"\nif ! \"$GIT\" -C \"$TR\" worktree add --force -B \"$BR\" \"$WT\" \"$BASE\" >/dev/null 2>&1; then printf 'build_failed'; exit 0; fi\n\"$GIT\" -C \"$WT\" config user.email >/dev/null 2>&1 || \"$GIT\" -C \"$WT\" config user.email \"amplifier-bot@users.noreply.github.com\" >/dev/null 2>&1 || true\n\"$GIT\" -C \"$WT\" config user.name >/dev/null 2>&1 || \"$GIT\" -C \"$WT\" config user.name \"amplifier-bot\" >/dev/null 2>&1 || true\nif ! \"$GIT\" -C \"$TR\" diff --name-only \"$BASE\" \"$FH\" > \"$DSR/changed.txt\" 2>/dev/null; then printf 'build_failed'; exit 0; fi\n: > \"$DSR/product.txt\"\nwhile IFS= read -r p; do\n[ -n \"$p\" ] || continue\ncase \"$p\" in\n.goal_lane*|*/.goal_lane*) continue ;;\nartifacts/*.done) continue ;;\ngenerated/plans/*) continue ;;\nesac\necho \"$p\" >> \"$DSR/product.txt\"\ndone < \"$DSR/changed.txt\"\nif [ ! -s \"$DSR/product.txt\" ]; then printf 'no_product_paths'; exit 0; fi\nwhile IFS= read -r p; do\nif \"$GIT\" -C \"$WT\" cat-file -e \"$FH:$p\" 2>/dev/null; then \"$GIT\" -C \"$WT\" checkout \"$FH\" -- \"$p\" 2>/dev/null || true; else \"$GIT\" -C \"$WT\" rm -q -f --ignore-unmatch -- \"$p\" 2>/dev/null || true; fi\ndone < \"$DSR/product.txt\"\nif \"$GIT\" -C \"$WT\" diff --cached --quiet; then printf 'no_product_paths'; exit 0; fi\nif ! \"$GIT\" -C \"$WT\" commit -q -m \"goal_plan_smoke delivery (run $run_id)\" 2>/dev/null; then printf 'build_failed'; exit 0; fi\nNEWSHA=$(\"$GIT\" -C \"$WT\" rev-parse HEAD 2>/dev/null)\nif [ -z \"$NEWSHA\" ]; then printf 'build_failed'; exit 0; fi\nprintf '{\"final_head\": \"%s\", \"delivery_worktree\": \"%s\"}' \"$NEWSHA\" \"$WT\" > \"$DSR/clean_refs.json\"\nprintf 'built'"
+  ];
+  BuildCleanDelivery -> LoadCleanRefs [condition="context.tool.last_line=built", weight="2"];
+  BuildCleanDelivery -> Failed        [condition="context.tool.last_line=no_product_paths"];
+  BuildCleanDelivery -> Failed        [condition="context.tool.last_line=build_failed"];
+  BuildCleanDelivery -> Failed        [condition="outcome=fail", runs_on="failure"]; // safety net (RUBRIC.md 3.2)
+
+  // Inject the clean commit SHA (as final_head) + the delivery worktree path
+  // into context. parse_json needs clean JSON on stdout -- BuildCleanDelivery
+  // wrote exactly that to clean_refs.json, so this just cats it.
+  LoadCleanRefs [
+    shape=parallelogram, label="Load Clean Refs (rebind final_head)",
+    tool_command="#!/bin/sh\ncat \"$delivery_state_root/clean_refs.json\"",
+    parse_json="true"
+  ];
+  LoadCleanRefs -> PushDelivery;
+  LoadCleanRefs -> Failed [condition="outcome=fail", runs_on="failure"]; // safety net (RUBRIC.md 3.2)
+
+  // Deterministic non-force push of the clean delivery branch straight from
+  // $delivery_worktree. Was an LLM box ("push the current HEAD") -- but a push
+  // is pure mechanics, not judgment (primer tier discipline), and the box ran
+  // in the wrong cwd (the plan-branch checkout), which is how the plan commit
+  // leaked out. Clears push_status.txt first (idempotency, RUBRIC.md 4), then
+  // records the evidence CheckPush reads. The linked worktree shares
+  // $target_repo's remote + credentials, so origin auth is inherited.
+  PushDelivery [
+    shape=parallelogram, label="Push Delivery Branch (no-force)",
+    tool_command="#!/bin/sh\nGIT=\"${git_bin:-git}\"\nWT=\"$delivery_worktree\"\nBR=\"$delivery_branch\"\nDSR=\"$delivery_state_root\"\nrm -f \"$DSR/push_status.txt\"\nif [ -n \"$WT\" ] && [ -d \"$WT\" ]; then\n\"$GIT\" -C \"$WT\" push origin \"$BR\" 2>\"$DSR/push.err\" && { \"$GIT\" -C \"$WT\" rev-parse --abbrev-ref HEAD; echo pushed; } > \"$DSR/push_status.txt\"\nfi\nprintf 'push_attempted'"
+  ];
+  PushDelivery -> CheckPush;
+  PushDelivery -> Failed [condition="outcome=fail", runs_on="failure"]; // safety net (RUBRIC.md 3.2)
+
+  CheckPush [
+    shape=parallelogram, label="Check Push",
+    tool_command="#!/bin/sh\nset -e\nif [ -f \"$delivery_state_root/push_status.txt\" ] && tail -1 \"$delivery_state_root/push_status.txt\" | grep -q pushed; then\n  printf 'pushed'\nelse\n  printf 'push_failed'\nfi"
+  ];
+  CheckPush -> OpenPR  [condition="context.tool.last_line=pushed", weight="2"];
+  CheckPush -> Failed  [condition="context.tool.last_line=push_failed"];
+
+  OpenPR [
+    shape=box, fidelity="full",
+    label="Open PR",
+    prompt="Open a REAL pull request on GitHub (https://github.com/$repo) for branch $delivery_branch against $repo's default branch -- use the gh CLI (`gh pr create --repo $repo --head $delivery_branch ...`) or the GitHub REST API directly (POST https://api.github.com/repos/$repo/pulls with GH_TOKEN), NOT any other git host or a simulated/local PR. Write a PR description summarizing the goal_plan_smoke run (lanes integrated, verification evidence). Write the resulting real github.com PR URL to $delivery_state_root/pr_url.txt. Print the single line: {\"pr_url\": \"<url>\"} as JSON."
+  ];
+  OpenPR -> ExtractPRUrl;
+
+  // Extracts the URL OpenPR claims -- NOT yet trusted (RUBRIC.md 2).
+  ExtractPRUrl [
+    shape=parallelogram, label="Extract PR URL (claimed)",
+    tool_command="#!/bin/sh\nset -e\nurl=$(cat \"$delivery_state_root/pr_url.txt\")\nprintf '{\"delivery.pr_url\": \"%s\"}' \"$url\"",
+    parse_json="true"
+  ];
+  ExtractPRUrl -> CheckPROpened;
+
+  // Independent verification: the claimed PR must exist AND its head SHA must
+  // equal $final_head -- which BuildCleanDelivery rebound to the CLEAN
+  // delivered commit -- exact-head proof (design doc Task 9). gh/curl only
+  // (portability). ${delivery.pr_url} (brace+dotted) is the form that resolves
+  // the dotted context key ExtractPRUrl set.
+  CheckPROpened [
+    shape=parallelogram, label="Verify PR Opened At Final HEAD",
+    tool_command="#!/bin/sh\nnum=$(printf '%s' \"${delivery.pr_url}\" | grep -oE '[0-9]+$' 2>/dev/null || true)\nif [ -z \"$num\" ]; then printf 'not_verified'; exit 0; fi\nhead_sha=$(gh pr view \"$num\" --repo \"$repo\" --json headRefOid --jq .headRefOid 2>/dev/null || true)\nif [ -z \"$head_sha\" ]; then\n  head_sha=$(curl -sf -H \"Authorization: token ${GH_TOKEN}\" \"https://api.github.com/repos/$repo/pulls/$num\" 2>/dev/null | python3 -c \"import sys,json;print(json.load(sys.stdin).get('head',{}).get('sha',''))\" 2>/dev/null || true)\nfi\nif [ \"$head_sha\" = \"$final_head\" ]; then\n  printf 'verified'\nelse\n  printf 'not_verified'\nfi"
+  ];
+  CheckPROpened -> MarkOpened  [condition="context.tool.last_line=verified && outcome=success", weight="2"];
+  CheckPROpened -> Failed      [condition="context.tool.last_line=not_verified && outcome=success"];
+  CheckPROpened -> Failed      [condition="outcome=fail", runs_on="failure"]; // safety net (RUBRIC.md 3.2)
+
+  MarkOpened [
+    shape=parallelogram, label="Mark Opened (verified)",
+    tool_command="printf '{\"delivery.result\": \"opened\"}'",
+    parse_json="true"
+  ];
+  MarkOpened -> Exit;
+
+  Failed [
+    shape=parallelogram, label="Mark Failed", runs_on="always",
+    tool_command="printf '{\"delivery.result\": \"failed\"}'",
+    parse_json="true"
+  ];
+  Failed -> Exit;
+}
