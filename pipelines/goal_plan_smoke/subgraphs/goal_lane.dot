@@ -1,0 +1,173 @@
+// goal_lane.dot
+//
+// Bounded child convergence graph for the goal_plan_smoke family (design
+// doc Task 6). Runs headless inside one lane's own git worktree (parent
+// launches it with `--cwd .`). Performs a feedback-informed, budget-bounded
+// attempt/verify/diagnose loop and hands back only a candidate commit plus
+// evidence -- this graph never certifies its own final success to the
+// parent; the parent independently re-verifies the candidate (see
+// goal_plan_smoke.dot's ParentVerify node).
+//
+// Reuses pipelines/goal_plan_smoke/python/goal_plan_runtime.py's
+// `run_child_attempt_verifier_envelope` (dirty-tolerant child verifier
+// envelope) unchanged -- this DOT file never edits that module, only calls
+// it via inline python3, per the lane's ownership contract.
+//
+// Required context ($param):
+//   $lane_id            - "lane_a" | "lane_b" | "lane_c"
+//   $marker_file         - e.g. "SMOKE_MARKER_lane_a.txt"
+//   $marker_content      - e.g. "lane_a:ok"
+//   $seeded_failure       - OPTIONAL legacy/test-only param. No longer
+//                          consumed: the seeded-failure smoke fixture that
+//                          used it was removed so this subgraph is reusable
+//                          for arbitrary lanes. Retained here only because
+//                          the existing goal_plan_smoke.dot parent still
+//                          passes it; new callers may omit it (default /
+//                          omitted == run the normal real task).
+//   $runtime_py_dir      - absolute path to pipelines/goal_plan_smoke/python
+//   $output_root         - external per-attempt verifier output root
+//   $evidence_path        - external evidence JSON path for this lane
+//   $max_attempts         - budget-ledger reservation cap surfaced by the
+//                          parent (informational default here; the parent's
+//                          BudgetLedger is the authoritative enforcement --
+//                          see goal_plan_smoke.dot)
+//
+// Context outputs:
+//   lane.result          - "candidate" | "blocked"
+//   lane.candidate_sha    - set only when lane.result="candidate"
+//   lane.blocker_reason    - set only when lane.result="blocked"
+
+digraph goal_lane {
+  graph [rankdir=LR, default_max_retry=1, default_fidelity="summary:high"];
+
+  Start [shape=Mdiamond, label="Start"];
+  Exit  [shape=Msquare,  label="Exit"];
+
+  // Deterministic: capture the base HEAD this lane started from and make
+  // the local iteration counter idempotent (RUBRIC.md \u00a74 idempotency --
+  // a fresh run of this graph in a fresh worktree must not inherit a stale
+  // counter from a prior run's leftover file).
+  Orient [
+    shape=parallelogram, label="Orient",
+    tool_command="#!/bin/sh\nset -e\n[ -f .goal_lane_iteration ] || printf '0' > .goal_lane_iteration\nbase=$(git rev-parse HEAD)\nprintf '{\"lane.base_sha\": \"%s\"}' \"$base\"",
+    parse_json="true"
+  ];
+  Start -> Orient -> ReserveAttempt;
+
+  // Deterministic budget gate. Uses the sealed runtime's BudgetLedger so
+  // attempt accounting is the same flock-protected ledger the parent reads
+  // during recovery -- not a private counter this graph invents.
+  ReserveAttempt [
+    shape=parallelogram, label="Reserve Attempt Budget",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\ntry:\n    limits = gpr.BudgetLimits(\n        max_total_attempts=$max_attempts,\n        max_process_launches=999,\n        max_integration_corrections=999,\n        max_pipeline_seconds=999999.0,\n    )\n    ledger = gpr.BudgetLedger(\"$ledger_path\", \"$ledger_lock_path\", limits, run_id=\"$run_id\")\n    ledger.reserve_attempt(\"$lane_id\" + \":\" + open(\".goal_lane_iteration\").read().strip())\n    print(\"reserved\")\nexcept gpr.GoalPlanRuntimeError as e:\n    print(\"exhausted:\" + str(e))\nPYEOF"
+  ];
+
+  ReserveAttempt -> Attempt        [condition="context.tool.last_line=reserved", weight="2"];
+  ReserveAttempt -> BudgetExhausted [condition="context.tool.last_line!=reserved"];
+
+  // LLM judgment node -- the only place in this graph a model is asked to
+  // do more than type a deterministic string. Writes the lane's candidate
+  // marker file, reading and addressing any curated feedback left by a
+  // prior failed iteration. (A smoke-test-only seeded-failure fixture,
+  // conditioned on $seeded_failure=true, was removed from this prompt so the
+  // subgraph carries no dead test-fixture weight into reuse by arbitrary
+  // lanes; the original fixture is still described in plan.json's
+  // lanes.lane_b.seeded_failure_note for historical reference.)
+  Attempt [
+    shape=box, fidelity="full",
+    label="Attempt",
+    prompt="You are lane $lane_id in the goal_plan_smoke static graph family's smoke test. Your ONLY job: write a file named $marker_file in the current directory containing exactly the text: $marker_content (no trailing content beyond a single optional trailing newline). First check whether a file named .goal_lane_feedback.txt exists in the current directory -- if it does, it holds one curated critique of your PREVIOUS attempt; read it and make sure this attempt addresses it. After writing the file, append 1 to the integer in .goal_lane_iteration (idempotent: read the current integer, add 1, overwrite). Print the single line: attempted"
+  ];
+
+  Attempt -> ChildVerify;
+
+  // Dirty-tolerant child verifier envelope (goal_plan_runtime.py,
+  // unmodified). Verifies the working tree's uncommitted marker file
+  // directly -- evidence, not the box node's own "attempted" self-report
+  // (RUBRIC.md \u00a72).
+  ChildVerify [
+    shape=parallelogram, label="Child Verify (envelope)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\n# Read the iteration counter INSIDE python, not via a shell $n substituted\n# into a quoted (<<'PYEOF') heredoc -- a quoted heredoc terminator disables\n# all shell expansion in its body, so a shell-side $n would never actually\n# interpolate here (caught live: Wave 3 smoke run hit\n# ENVELOPE:OUTPUT_ROOT_NOT_EXTERNAL because the literal text \"attempt-$n\"\n# was passed through unexpanded).\nn = open(\".goal_lane_iteration\").read().strip()\nresult = gpr.run_child_attempt_verifier_envelope(\n    git_argv_prefix=(\"git\",),\n    worktree_path=\".\",\n    verifier_argv=[\"/bin/sh\", \"-c\", \"test -f $marker_file && [ \\\"$(cat $marker_file)\\\" = \\\"$marker_content\\\" ]\"],\n    timeout_seconds=30,\n    output_root=\"$output_root/attempt-\" + n,\n    evidence_path=\"$evidence_path\",\n)\nprint(result.verdict)\nPYEOF"
+  ];
+
+  ChildVerify -> Candidate      [condition="context.tool.last_line=PASS && outcome=success", weight="2"];
+  ChildVerify -> Diagnose       [condition="context.tool.last_line=FAIL && outcome=success"];
+  ChildVerify -> InfraExit      [condition="context.tool.last_line=INFRA && outcome=success"];
+  ChildVerify -> InfraExit      [condition="outcome=fail", runs_on="failure"]; // safety net: envelope crashed entirely (RUBRIC.md 3.2)
+
+  // Only a PASS verdict from the envelope is allowed to produce a commit --
+  // this is the sole success exit of the whole subgraph.
+  // Writes the outcome to $lane_result_path on disk (not just engine
+  // context) because the parent observes this lane through a separate OS
+  // process (goal_plan_supervisor.py) -- in-process DOT context never
+  // crosses that boundary. This file, not this node's own exit, is what
+  // the parent's LaunchLane step reads (RUBRIC.md \u00a72: a claim from
+  // inside the child process is not evidence until read back from disk).
+  Candidate [
+    shape=parallelogram, label="Commit Candidate",
+    tool_command="#!/bin/sh\nset -e\ngit add \"$marker_file\"\n# Idempotent: the Attempt/Diagnose model occasionally commits its own\n# fix mid-task even though never instructed to (caught live -- a real\n# commit named \"fix: write correct lane_b:ok content per feedback\"\n# appeared on lane_b's branch with no Candidate-node involvement). When\n# that happens $marker_file is already committed and unchanged, so\n# `git add` stages nothing and a plain `git commit` would abort with\n# \"nothing to commit\" -- only commit when something is actually staged;\n# either way HEAD already carries the correct marker content.\ngit diff --cached --quiet || git commit --quiet -m \"goal_plan_smoke($lane_id): candidate marker\"\nsha=$(git rev-parse HEAD)\nprintf '{\"result\": \"candidate\", \"candidate_sha\": \"%s\"}' \"$sha\" > \"$lane_result_path\"\nprintf '{\"lane.result\": \"candidate\", \"lane.candidate_sha\": \"%s\"}' \"$sha\"",
+    parse_json="true"
+  ];
+  Candidate -> Exit;
+
+  // LLM judgment node: curate ONE highest-leverage critique, replacing (not
+  // appending to) any stale feedback file -- RUBRIC.md \u00a74 feedback
+  // curation. Also records this failure's signature (append-only log) so
+  // RepeatCheck can distinguish a fresh failure from the same failure
+  // recurring, per primer.md doctrine #6.
+  Diagnose [
+    shape=box, fidelity="full",
+    label="Diagnose",
+    prompt="Lane $lane_id's attempt failed independent verification (see $evidence_path for the envelope's recorded verifier output). Read $marker_file's current content if it exists. Overwrite .goal_lane_feedback.txt (replace entirely, do not append) with the ONE single highest-leverage, specific correction the next attempt needs -- do not restate the whole task, just the delta. Then append one line to .goal_lane_failure_signatures.log containing a short stable signature string for THIS failure class (e.g. the actual vs expected marker content, normalized -- so an identical repeat failure produces an identical line). Print the single line: diagnosed"
+  ];
+
+  Diagnose -> RepeatCheck;
+
+  // Deterministic: distinguish a fresh failure (worth another attempt) from
+  // the identical failure recurring (a deterministic bug the loop cannot
+  // absorb -- primer.md doctrine #7).
+  RepeatCheck [
+    shape=parallelogram, label="Repeated-Failure Check",
+    tool_command="#!/bin/sh\nset -e\nlog=.goal_lane_failure_signatures.log\nn=$(wc -l < \"$log\" | tr -d ' ')\nif [ \"$n\" -ge 2 ]; then\n  last=$(tail -1 \"$log\")\n  prev=$(sed -n \"$((n-1))p\" \"$log\")\n  if [ \"$last\" = \"$prev\" ]; then printf 'repeated_signature'; exit 0; fi\nfi\nprintf 'new_signature'"
+  ];
+
+  RepeatCheck -> Postmortem      [condition="context.tool.last_line=repeated_signature"];
+  RepeatCheck -> ReserveAttempt  [condition="context.tool.last_line=new_signature", loop_restart="true"];
+
+  // A repeated identical failure is root-cause postmortem territory, not
+  // another blind retry (primer.md doctrine #7) -- exits as a named,
+  // evidence-bearing blocker rather than silently looping or bare-failing.
+  Postmortem [
+    shape=box, fidelity="full",
+    label="Postmortem (repeated failure)",
+    prompt="Lane $lane_id has now hit the SAME failure signature twice in a row (see .goal_lane_failure_signatures.log) -- this is very likely a deterministic bug or an unfixable task specification, not model drift a retry can correct. Write a short honest postmortem to .goal_lane_postmortem.txt: what was attempted, what the repeated failure signature is, and why a further blind retry is unlikely to help. Print the single line: postmortem_written"
+  ];
+  Postmortem -> BlockedExit;
+
+  BudgetExhausted [
+    shape=parallelogram, label="Budget Exhausted",
+    tool_command="printf '{\"lane.blocker_reason\": \"budget_exhausted\"}'",
+    parse_json="true"
+  ];
+  BudgetExhausted -> BlockedExit;
+
+  InfraExit [
+    shape=parallelogram, label="Infra Failure", runs_on="always",
+    tool_command="printf '{\"lane.blocker_reason\": \"infra_failure\"}'",
+    parse_json="true"
+  ];
+  InfraExit -> BlockedExit;
+
+  // Single, explicit, evidence-bearing non-success exit -- budget
+  // exhaustion and infra failure both route here as a decision point
+  // (primer.md doctrine #5: "the bound is a decision point, not a fuse"),
+  // never as a bare crash. runs_on="always" on this and InfraExit above
+  // declares this handled-failure termination path explicitly (avoids the
+  // silent-success-exit incident class the linter flags).
+  BlockedExit [
+    shape=parallelogram, label="Blocked Exit", runs_on="always",
+    tool_command="#!/bin/sh\nset -e\nprintf '{\"result\": \"blocked\", \"blocker_reason\": \"${lane.blocker_reason}\"}' > \"$lane_result_path\"\nprintf '{\"lane.result\": \"blocked\"}'",
+    parse_json="true"
+  ];
+  BlockedExit -> Exit;
+}

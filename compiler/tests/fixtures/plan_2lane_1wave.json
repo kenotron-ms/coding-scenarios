@@ -1,0 +1,27 @@
+{
+  "schema_version": "goal-plan.plan/v1",
+  "plan_id": "two_lane_single_wave",
+  "product_base_sha": "0000000000000000000000000000000000000000",
+  "description": "D4 fixture: minimal 2-lane, single-wave plan. Both lanes run concurrently in wave 1; there is no later wave, so the pipeline has no sequential just-in-time launch node and the last Integrate routes straight to PreCoherenceAggregate.",
+  "lanes": {
+    "lane_x": {
+      "wave": 1,
+      "depends_on": [],
+      "marker_file": "SMOKE_MARKER_lane_x.txt",
+      "marker_content": "lane_x:ok",
+      "verifier_argv": ["/bin/sh", "-c", "test -f SMOKE_MARKER_lane_x.txt && [ \"$(cat SMOKE_MARKER_lane_x.txt)\" = \"lane_x:ok\" ]"]
+    },
+    "lane_y": {
+      "wave": 1,
+      "depends_on": [],
+      "marker_file": "SMOKE_MARKER_lane_y.txt",
+      "marker_content": "lane_y:ok",
+      "verifier_argv": ["/bin/sh", "-c", "test -f SMOKE_MARKER_lane_y.txt && [ \"$(cat SMOKE_MARKER_lane_y.txt)\" = \"lane_y:ok\" ]"]
+    }
+  },
+  "waves": [
+    {"wave": 1, "lanes": ["lane_x", "lane_y"]}
+  ],
+  "integration_order": ["lane_x", "lane_y"],
+  "terminals": ["COMPLETE", "RESIDUALS_READY", "INFRA_FAILURE", "ABORTED"]
+}

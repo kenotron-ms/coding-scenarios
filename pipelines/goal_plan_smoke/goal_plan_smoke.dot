@@ -1,0 +1,377 @@
+// goal_plan_smoke.dot
+//
+// Static parent program for the goal_plan_smoke member of the Goal Plan
+// Attractor family (design doc docs/plans/2026-08-23-goal-plan-attractor-
+// implementation.md, Tasks 7-9). This file is the reviewed, fixed control
+// flow -- it is NOT a scheduler that reads plan.json to decide what runs.
+// plan.json is audit/design-time data; CheckPlanCorrespondence below proves
+// this file's embedded plan_* graph attributes agree with it, but nothing
+// here iterates plan.json's arrays to drive execution.
+//
+// Every lane (lane_a, lane_b, lane_c) runs as one Git worktree + one
+// headless child Attractor process, reaped by one
+// pipelines/goal_plan_smoke/python/goal_plan_supervisor.py instance. This
+// parent never trusts a child's self-report: worktree ownership, candidate
+// commits, and aggregate state are all independently re-verified via
+// pipelines/goal_plan_smoke/python/goal_plan_runtime.py (unmodified,
+// called only via inline python3 -- consuming its command contracts, per
+// this lane's ownership rules).
+//
+// Required context ($param) -- supplied by the harness/bootstrap at launch:
+//   $target_repo, $state_root, $worktree_root, $delivery_state_root
+//   $run_id, $repo (owner/name, only used if $delivery_enabled=true)
+//   $delivery_enabled ("true"|"false")
+//   $runtime_py_dir     - absolute path to pipelines/goal_plan_smoke/python
+//   $git_bin            - absolute, authenticated git argv prefix (single token)
+//   $runner_pythonpath  - PYTHONPATH entries (colon-joined) so the child's
+//                         `python3 -m amplifier_module_pipeline_runner.cli`
+//                         invocation resolves
+//   $subgraphs_dir      - absolute path to pipelines/goal_plan_smoke/subgraphs
+//
+// Graph-level plan correspondence attributes (Wave 0 proof target -- see
+// plan.json's top-level "static_correspondence" block, which
+// CheckPlanCorrespondence below diffs against these verbatim):
+digraph goal_plan_smoke {
+  graph [
+    rankdir=TB,
+    label="goal_plan_smoke -- Goal Plan Attractor family, static parent",
+    default_max_retry=1,
+    default_fidelity="summary:high",
+    plan_lanes="lane_a,lane_b,lane_c",
+    plan_waves="1,2",
+    plan_integration_order="lane_a,lane_b,lane_c",
+    plan_terminals="COMPLETE,RESIDUALS_READY,INFRA_FAILURE,ABORTED"
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+  Exit  [shape=Msquare,  label="Exit"];
+
+  // ---------------------------------------------------------------------
+  // Wave 0: abort signal + plan/DOT correspondence + admission
+  // ---------------------------------------------------------------------
+
+  // Deterministic: an external, harness-owned abort signal is checked
+  // before any other work -- this is the sole reachability path to
+  // ABORTED (design doc: "an approved abort or unrecoverable run stop was
+  // recorded"). $state_root/ABORT_REQUESTED is written only by an operator
+  // or the harness, never by this graph itself.
+  CheckAbortRequested [
+    shape=parallelogram, label="Check Abort Requested",
+    tool_command="#!/bin/sh\nset -e\nif [ -f \"$state_root/ABORT_REQUESTED\" ]; then printf 'abort_requested'; else printf 'proceed'; fi"
+  ];
+  Start -> CheckAbortRequested;
+  CheckAbortRequested -> CheckPlanCorrespondence [condition="context.tool.last_line=proceed", weight="2"];
+  CheckAbortRequested -> AbortedCarrier          [condition="context.tool.last_line=abort_requested"];
+
+  // Deterministic: this file's own plan_* graph attributes (declared above,
+  // literally in this DOT source) must agree with the checked-in
+  // plan.json's static_correspondence block. This is the "plan<->DOT
+  // correspondence" proof -- structural agreement between two checked-in
+  // files, not a runtime scheduler reading plan.json to decide lanes.
+  CheckPlanCorrespondence [
+    shape=parallelogram, label="Check Plan<->DOT Correspondence",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport json, re\nwith open(\"pipelines/goal_plan_smoke/plan.json\") as f:\n    plan = json.load(f)\nwith open(\"pipelines/goal_plan_smoke/goal_plan_smoke.dot\") as f:\n    dot_src = f.read()\ndef attr(name):\n    m = re.search(name + r'=\"([^\"]*)\"', dot_src)\n    return m.group(1) if m else None\nok = True\nok &= attr(\"plan_lanes\") == \",\".join(sorted(plan[\"lanes\"].keys()))\nok &= attr(\"plan_waves\") == \",\".join(str(w[\"wave\"]) for w in plan[\"waves\"])\nok &= attr(\"plan_integration_order\") == \",\".join(plan[\"integration_order\"])\nok &= attr(\"plan_terminals\") == \",\".join(plan[\"terminals\"])\nok &= sorted(plan[\"lanes\"].keys()) == plan[\"static_correspondence\"][\"lane_ids_sorted\"]\nok &= [w[\"wave\"] for w in plan[\"waves\"]] == plan[\"static_correspondence\"][\"wave_numbers\"]\nok &= len(plan[\"terminals\"]) == plan[\"static_correspondence\"][\"terminal_count\"]\nprint(\"correspondence_ok\" if ok else \"correspondence_mismatch\")\nPYEOF"
+  ];
+  Start -> CheckPlanCorrespondence;
+  CheckPlanCorrespondence -> Admit             [condition="context.tool.last_line=correspondence_ok", weight="2"];
+  CheckPlanCorrespondence -> PrelaunchBlocked  [condition="context.tool.last_line=correspondence_mismatch"];
+
+  // Root admission gate (goal_plan_runtime.admit_run, unmodified). Any
+  // ADMISSION:* GoalPlanRuntimeError is a prelaunch infrastructure block,
+  // never a graph-terminal failure -- the graph hasn't meaningfully
+  // started yet.
+  Admit [
+    shape=parallelogram, label="Admit Run",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\ntry:\n    gpr.admit_run(\n        target_repo=\"$target_repo\",\n        state_root=\"$state_root\",\n        worktree_root=\"$worktree_root\",\n        delivery_state_root=\"$delivery_state_root\",\n        compiled_source_paths={\"runtime\": \"$runtime_py_dir/goal_plan_runtime.py\"},\n        parent_binding={\"run_id\": \"$run_id\"},\n        git_argv_prefix=(\"$git_bin\",),\n    )\n    print(\"admitted\")\nexcept gpr.GoalPlanRuntimeError as e:\n    print(\"blocked:\" + str(e))\nPYEOF"
+  ];
+  Admit -> Wave1Launch          [condition="context.tool.last_line=admitted", weight="2"];
+  Admit -> PrelaunchBlocked     [condition="context.tool.last_line!=admitted"];
+
+  PrelaunchBlocked [
+    shape=parallelogram, label="Prelaunch Infrastructure Blocked",
+    tool_command="printf '{\"terminal.status\": \"PRELAUNCH_INFRASTRUCTURE_BLOCKED\"}'",
+    parse_json="true"
+  ];
+  PrelaunchBlocked -> InfraCarrier;
+
+  // ---------------------------------------------------------------------
+  // Wave 1: lane_a and lane_b concurrently (component fan-out / tripleoctagon fan-in)
+  // ---------------------------------------------------------------------
+
+  Wave1Launch [
+    shape=component, label="Wave 1: Launch lane_a + lane_b",
+    join_policy="wait_all", error_policy="continue", max_parallel=2
+  ];
+  Wave1Launch -> LaunchLaneA;
+  Wave1Launch -> LaunchLaneB;
+
+  // Each LaunchLaneX node: register+create a lane worktree at the admitted
+  // base HEAD, write a supervisor process-launch contract + launch intent,
+  // then run the supervisor's `run` subcommand in the foreground (it
+  // blocks until the OS-level child terminates -- the two branches still
+  // run concurrently because ParallelHandler executes them as separate
+  // async branches, giving two real, separate supervisor OS processes).
+  // Truth about the child's fate comes ONLY from the supervisor's
+  // `--result` file (raw waitpid status) -- never from whether an
+  // artifact merely exists (design doc: "Exit truth ... supervisor
+  // evidence").
+  LaunchLaneA [
+    shape=parallelogram, label="Launch lane_a",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json, subprocess\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nregistry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\nwt = gpr.create_registered_worktree(registry, (\"$git_bin\",), \"$target_repo\", \"$worktree_root\", \"lane_a\", kind=\"lane\", commit_sha=\"$product_base_sha\", branch=\"goal-plan-smoke/lane_a\")\ncontract = {\n    \"schema_version\": \"goal-plan.process-launch-contract/v1\",\n    \"process_kind\": \"lane\", \"process_id\": \"lane_a\", \"process_run_id\": \"$run_id-lane_a\",\n    \"child_argv\": [\"python3\", \"-m\", \"amplifier_module_pipeline_runner.cli\", \"run\",\n                   \"$subgraphs_dir/goal_lane.dot\", \"--cwd\", \".\", \"--on-human-gate\", \"fail\",\n                   \"--param\", \"lane_id=lane_a\", \"--param\", \"marker_file=SMOKE_MARKER_lane_a.txt\",\n                   \"--param\", \"marker_content=lane_a:ok\", \"--param\", \"seeded_failure=false\",\n                   \"--param\", \"runtime_py_dir=$runtime_py_dir\",\n                   \"--param\", \"output_root=$state_root/verify-out/lane_a\",\n                   \"--param\", \"evidence_path=$state_root/evidence/lane_a.json\",\n                   \"--param\", \"lane_result_path=$state_root/lane-results/lane_a.json\",\n                   \"--param\", \"ledger_path=$state_root/budgets/lane_a.json\",\n                   \"--param\", \"ledger_lock_path=$state_root/budgets/lane_a.lock\",\n                   \"--param\", \"run_id=$run_id\", \"--param\", \"max_attempts=3\"],\n    \"child_cwd\": wt, \"child_env\": {\"PYTHONPATH\": \"$runner_pythonpath\"},\n    \"wall_timeout_seconds\": 600, \"term_grace_seconds\": 10,\n    \"stdout_path\": \"$state_root/logs/lane_a.stdout\", \"stderr_path\": \"$state_root/logs/lane_a.stderr\",\n}\nimport os\nos.makedirs(\"$state_root/contracts\", exist_ok=True)\nos.makedirs(\"$state_root/lane-results\", exist_ok=True)\nos.makedirs(\"$state_root/logs\", exist_ok=True)\nimport hashlib\nwith open(\"$state_root/contracts/lane_a.json\", \"w\") as f:\n    json.dump(contract, f, sort_keys=True)\ncontract_sha = hashlib.sha256(open(\"$state_root/contracts/lane_a.json\", \"rb\").read()).hexdigest()\nintent = {\"schema_version\": \"goal-plan.launch-intent/v1\", \"process_run_id\": \"$run_id-lane_a\", \"contract_sha256\": contract_sha}\nwith open(\"$state_root/contracts/lane_a.intent.json\", \"w\") as f:\n    json.dump(intent, f, sort_keys=True)\nrc = subprocess.run([\"python3\", \"$runtime_py_dir/goal_plan_supervisor.py\", \"run\",\n    \"--contract\", \"$state_root/contracts/lane_a.json\", \"--intent\", \"$state_root/contracts/lane_a.intent.json\",\n    \"--ledger\", \"$state_root/supervisor-ledger.json\", \"--ack\", \"$state_root/acks/lane_a.json\",\n    \"--result\", \"$state_root/results/lane_a.json\"])\nprint(\"launched\" if rc.returncode == 0 else \"supervisor_infra_failure\")\nPYEOF"
+  ];
+
+  // lane_b's contract is identical in shape but points at its own branch,
+  // worktree, and (per plan.json) the seeded_failure=true fixture --
+  // deliberately duplicated rather than parameterized, because
+  // $-substitution in this engine is global-per-run, not per-node.
+  LaunchLaneB [
+    shape=parallelogram, label="Launch lane_b (seeded failure fixture)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json, subprocess, os, hashlib\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nregistry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\nwt = gpr.create_registered_worktree(registry, (\"$git_bin\",), \"$target_repo\", \"$worktree_root\", \"lane_b\", kind=\"lane\", commit_sha=\"$product_base_sha\", branch=\"goal-plan-smoke/lane_b\")\ncontract = {\n    \"schema_version\": \"goal-plan.process-launch-contract/v1\",\n    \"process_kind\": \"lane\", \"process_id\": \"lane_b\", \"process_run_id\": \"$run_id-lane_b\",\n    \"child_argv\": [\"python3\", \"-m\", \"amplifier_module_pipeline_runner.cli\", \"run\",\n                   \"$subgraphs_dir/goal_lane.dot\", \"--cwd\", \".\", \"--on-human-gate\", \"fail\",\n                   \"--param\", \"lane_id=lane_b\", \"--param\", \"marker_file=SMOKE_MARKER_lane_b.txt\",\n                   \"--param\", \"marker_content=lane_b:ok\", \"--param\", \"seeded_failure=true\",\n                   \"--param\", \"runtime_py_dir=$runtime_py_dir\",\n                   \"--param\", \"output_root=$state_root/verify-out/lane_b\",\n                   \"--param\", \"evidence_path=$state_root/evidence/lane_b.json\",\n                   \"--param\", \"lane_result_path=$state_root/lane-results/lane_b.json\",\n                   \"--param\", \"ledger_path=$state_root/budgets/lane_b.json\",\n                   \"--param\", \"ledger_lock_path=$state_root/budgets/lane_b.lock\",\n                   \"--param\", \"run_id=$run_id\", \"--param\", \"max_attempts=3\"],\n    \"child_cwd\": wt, \"child_env\": {\"PYTHONPATH\": \"$runner_pythonpath\"},\n    \"wall_timeout_seconds\": 600, \"term_grace_seconds\": 10,\n    \"stdout_path\": \"$state_root/logs/lane_b.stdout\", \"stderr_path\": \"$state_root/logs/lane_b.stderr\",\n}\nos.makedirs(\"$state_root/contracts\", exist_ok=True)\nos.makedirs(\"$state_root/lane-results\", exist_ok=True)\nos.makedirs(\"$state_root/logs\", exist_ok=True)\nwith open(\"$state_root/contracts/lane_b.json\", \"w\") as f:\n    json.dump(contract, f, sort_keys=True)\ncontract_sha = hashlib.sha256(open(\"$state_root/contracts/lane_b.json\", \"rb\").read()).hexdigest()\nintent = {\"schema_version\": \"goal-plan.launch-intent/v1\", \"process_run_id\": \"$run_id-lane_b\", \"contract_sha256\": contract_sha}\nwith open(\"$state_root/contracts/lane_b.intent.json\", \"w\") as f:\n    json.dump(intent, f, sort_keys=True)\nrc = subprocess.run([\"python3\", \"$runtime_py_dir/goal_plan_supervisor.py\", \"run\",\n    \"--contract\", \"$state_root/contracts/lane_b.json\", \"--intent\", \"$state_root/contracts/lane_b.intent.json\",\n    \"--ledger\", \"$state_root/supervisor-ledger.json\", \"--ack\", \"$state_root/acks/lane_b.json\",\n    \"--result\", \"$state_root/results/lane_b.json\"])\nprint(\"launched\" if rc.returncode == 0 else \"supervisor_infra_failure\")\nPYEOF"
+  ];
+
+  LaunchLaneA -> Wave1Collect;
+  LaunchLaneB -> Wave1Collect;
+
+  // Fan-in (built-in FanInHandler -- shape=tripleoctagon must not also
+  // carry tool_command; the classification step below runs as a separate
+  // deterministic node immediately after fan-in completes).
+  Wave1Collect [
+    shape=tripleoctagon, label="Wave 1: Collect lane_a + lane_b"
+  ];
+  Wave1Collect -> ClassifyWave1;
+
+  // Reads BOTH supervisor result files (raw wait status) AND each lane's
+  // own $lane_result_path -- a lane result file existing is not enough;
+  // the supervisor result must independently show a clean exit, never a
+  // crashed/missing-result process treated as success (design doc
+  // "Missing supervisor result ... can never be accepted as lane success
+  // even when expected artifacts exist").
+  ClassifyWave1 [
+    shape=parallelogram, label="Classify Wave 1 Lane Outcomes",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport json, os\ndef classify(lane):\n    sup_path = \"$state_root/results/\" + lane + \".json\"\n    res_path = \"$state_root/lane-results/\" + lane + \".json\"\n    if not os.path.exists(sup_path):\n        return \"crashed\"\n    sup = json.load(open(sup_path))\n    if sup.get(\"verdict\") != \"EXITED\" or sup.get(\"normalized_exit_code\") != 0:\n        return \"crashed\"\n    if not os.path.exists(res_path):\n        return \"crashed\"\n    lane_result = json.load(open(res_path))\n    return lane_result.get(\"result\", \"crashed\")\na = classify(\"lane_a\")\nb = classify(\"lane_b\")\nprint(a + \",\" + b)\nPYEOF"
+  ];
+  ClassifyWave1 -> ParentVerifyA [condition="context.tool.last_line!=''"];
+
+  // ---------------------------------------------------------------------
+  // Parent-side verification + sequential integration (integration_order:
+  // lane_a, lane_b, lane_c). Each ParentVerifyX runs
+  // goal_plan_runtime.run_parent_verifier_envelope in a clean, disposable,
+  // detached worktree at the EXACT candidate commit -- never trusting the
+  // lane's own worktree state.
+  // ---------------------------------------------------------------------
+
+  ParentVerifyA [
+    shape=parallelogram, label="Parent-Verify lane_a Candidate",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_a.json\"))\nif lane_result.get(\"result\") != \"candidate\":\n    print(\"skip:\" + lane_result.get(\"blocker_reason\", \"unknown\"))\nelse:\n    registry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\n    result = gpr.run_parent_verifier_envelope(\n        registry=registry, git_argv_prefix=(\"$git_bin\",), target_repo=\"$target_repo\",\n        worktree_root=\"$worktree_root\", worktree_id=\"candidate-lane_a\",\n        candidate_sha=lane_result[\"candidate_sha\"],\n        verifier_argv=[\"/bin/sh\", \"-c\", \"test -f SMOKE_MARKER_lane_a.txt && [ \\\"$(cat SMOKE_MARKER_lane_a.txt)\\\" = \\\"lane_a:ok\\\" ]\"],\n        timeout_seconds=30, output_root=\"$state_root/verify-out/candidate-lane_a\",\n        evidence_path=\"$state_root/evidence/candidate-lane_a.json\",\n    )\n    print(result.verdict)\nPYEOF"
+  ];
+  ParentVerifyA -> IntegrateA   [condition="context.tool.last_line=PASS", weight="2"];
+  ParentVerifyA -> InfraCarrier [condition="context.tool.last_line=INFRA"];
+  ParentVerifyA -> Residuals    [condition="context.tool.last_line=FAIL"];
+  ParentVerifyA -> Residuals    [condition="context.tool.last_line!=PASS"]; // covers "skip:*" (lane never produced a candidate)
+
+  IntegrateA [
+    shape=parallelogram, label="Integrate lane_a (merge + aggregate)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_a.json\"))\njournal = gpr.IntegrationJournal(\"$state_root/integration-journal.json\", \"$state_root/integration-journal.lock\")\nentry = gpr.integrate_candidate(\n    git_argv_prefix=(\"$git_bin\",), integration_worktree=\"$target_repo\", journal=journal,\n    lane_id=\"lane_a\", candidate_sha=lane_result[\"candidate_sha\"],\n    aggregate_verifier_argv=[\"/bin/sh\", \"-c\", \"test -f SMOKE_MARKER_lane_a.txt\"],\n    aggregate_timeout_seconds=30, output_root=\"$state_root/verify-out/aggregate-after-lane_a\",\n    evidence_path=\"$state_root/evidence/aggregate-after-lane_a.json\",\n)\nprint(entry[\"result\"])\nPYEOF"
+  ];
+  IntegrateA -> ParentVerifyB   [condition="context.tool.last_line=ACCEPTED", weight="2"];
+  IntegrateA -> InfraCarrier    [condition="context.tool.last_line=AGGREGATE_INFRA"];
+  IntegrateA -> Residuals       [condition="context.tool.last_line=MERGE_CONFLICT"];
+  IntegrateA -> Residuals       [condition="context.tool.last_line=AGGREGATE_FAIL"];
+
+  ParentVerifyB [
+    shape=parallelogram, label="Parent-Verify lane_b Candidate",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_b.json\"))\nif lane_result.get(\"result\") != \"candidate\":\n    print(\"skip:\" + lane_result.get(\"blocker_reason\", \"unknown\"))\nelse:\n    registry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\n    result = gpr.run_parent_verifier_envelope(\n        registry=registry, git_argv_prefix=(\"$git_bin\",), target_repo=\"$target_repo\",\n        worktree_root=\"$worktree_root\", worktree_id=\"candidate-lane_b\",\n        candidate_sha=lane_result[\"candidate_sha\"],\n        verifier_argv=[\"/bin/sh\", \"-c\", \"test -f SMOKE_MARKER_lane_b.txt && [ \\\"$(cat SMOKE_MARKER_lane_b.txt)\\\" = \\\"lane_b:ok\\\" ]\"],\n        timeout_seconds=30, output_root=\"$state_root/verify-out/candidate-lane_b\",\n        evidence_path=\"$state_root/evidence/candidate-lane_b.json\",\n    )\n    print(result.verdict)\nPYEOF"
+  ];
+  ParentVerifyB -> IntegrateB   [condition="context.tool.last_line=PASS", weight="2"];
+  ParentVerifyB -> InfraCarrier [condition="context.tool.last_line=INFRA"];
+  ParentVerifyB -> Residuals    [condition="context.tool.last_line=FAIL"];
+  ParentVerifyB -> Residuals    [condition="context.tool.last_line!=PASS"];
+
+  IntegrateB [
+    shape=parallelogram, label="Integrate lane_b (merge + aggregate)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_b.json\"))\njournal = gpr.IntegrationJournal(\"$state_root/integration-journal.json\", \"$state_root/integration-journal.lock\")\nentry = gpr.integrate_candidate(\n    git_argv_prefix=(\"$git_bin\",), integration_worktree=\"$target_repo\", journal=journal,\n    lane_id=\"lane_b\", candidate_sha=lane_result[\"candidate_sha\"],\n    aggregate_verifier_argv=[\"/bin/sh\", \"-c\", \"for f in lane_a lane_b; do test -f SMOKE_MARKER_$f.txt || exit 1; done\"],\n    aggregate_timeout_seconds=30, output_root=\"$state_root/verify-out/aggregate-after-lane_b\",\n    evidence_path=\"$state_root/evidence/aggregate-after-lane_b.json\",\n)\nprint(entry[\"result\"])\nPYEOF"
+  ];
+  IntegrateB -> LaunchLaneC     [condition="context.tool.last_line=ACCEPTED", weight="2"];
+  IntegrateB -> InfraCarrier    [condition="context.tool.last_line=AGGREGATE_INFRA"];
+  IntegrateB -> Residuals       [condition="context.tool.last_line=MERGE_CONFLICT"];
+  IntegrateB -> Residuals       [condition="context.tool.last_line=AGGREGATE_FAIL"];
+
+  // ---------------------------------------------------------------------
+  // Wave 2: lane_c, gated on both Wave 1 lanes integrated + aggregate green
+  // (structurally: LaunchLaneC is only reachable via IntegrateB's ACCEPTED
+  // edge, which itself required IntegrateA's ACCEPTED edge -- Wave 2
+  // cannot start earlier than that by construction, not by convention).
+  // ---------------------------------------------------------------------
+
+  LaunchLaneC [
+    shape=parallelogram, label="Launch lane_c (Wave 2, sequential)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json, subprocess, os, hashlib\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nregistry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\nintegration_head = subprocess.run([\"$git_bin\", \"rev-parse\", \"HEAD\"], cwd=\"$target_repo\", capture_output=True, text=True, check=True).stdout.strip()\nwt = gpr.create_registered_worktree(registry, (\"$git_bin\",), \"$target_repo\", \"$worktree_root\", \"lane_c\", kind=\"lane\", commit_sha=integration_head, branch=\"goal-plan-smoke/lane_c\")\ncontract = {\n    \"schema_version\": \"goal-plan.process-launch-contract/v1\",\n    \"process_kind\": \"lane\", \"process_id\": \"lane_c\", \"process_run_id\": \"$run_id-lane_c\",\n    \"child_argv\": [\"python3\", \"-m\", \"amplifier_module_pipeline_runner.cli\", \"run\",\n                   \"$subgraphs_dir/goal_lane.dot\", \"--cwd\", \".\", \"--on-human-gate\", \"fail\",\n                   \"--param\", \"lane_id=lane_c\", \"--param\", \"marker_file=SMOKE_MARKER_lane_c.txt\",\n                   \"--param\", \"marker_content=lane_c:ok\", \"--param\", \"seeded_failure=false\",\n                   \"--param\", \"runtime_py_dir=$runtime_py_dir\",\n                   \"--param\", \"output_root=$state_root/verify-out/lane_c\",\n                   \"--param\", \"evidence_path=$state_root/evidence/lane_c.json\",\n                   \"--param\", \"lane_result_path=$state_root/lane-results/lane_c.json\",\n                   \"--param\", \"ledger_path=$state_root/budgets/lane_c.json\",\n                   \"--param\", \"ledger_lock_path=$state_root/budgets/lane_c.lock\",\n                   \"--param\", \"run_id=$run_id\", \"--param\", \"max_attempts=3\"],\n    \"child_cwd\": wt, \"child_env\": {\"PYTHONPATH\": \"$runner_pythonpath\"},\n    \"wall_timeout_seconds\": 600, \"term_grace_seconds\": 10,\n    \"stdout_path\": \"$state_root/logs/lane_c.stdout\", \"stderr_path\": \"$state_root/logs/lane_c.stderr\",\n}\nwith open(\"$state_root/contracts/lane_c.json\", \"w\") as f:\n    json.dump(contract, f, sort_keys=True)\ncontract_sha = hashlib.sha256(open(\"$state_root/contracts/lane_c.json\", \"rb\").read()).hexdigest()\nintent = {\"schema_version\": \"goal-plan.launch-intent/v1\", \"process_run_id\": \"$run_id-lane_c\", \"contract_sha256\": contract_sha}\nwith open(\"$state_root/contracts/lane_c.intent.json\", \"w\") as f:\n    json.dump(intent, f, sort_keys=True)\nrc = subprocess.run([\"python3\", \"$runtime_py_dir/goal_plan_supervisor.py\", \"run\",\n    \"--contract\", \"$state_root/contracts/lane_c.json\", \"--intent\", \"$state_root/contracts/lane_c.intent.json\",\n    \"--ledger\", \"$state_root/supervisor-ledger.json\", \"--ack\", \"$state_root/acks/lane_c.json\",\n    \"--result\", \"$state_root/results/lane_c.json\"])\nsup = json.load(open(\"$state_root/results/lane_c.json\")) if rc.returncode == 0 and os.path.exists(\"$state_root/results/lane_c.json\") else {}\nprint(\"launched\" if sup.get(\"verdict\") == \"EXITED\" and sup.get(\"normalized_exit_code\") == 0 else \"crashed\")\nPYEOF"
+  ];
+  LaunchLaneC -> ParentVerifyC [condition="context.tool.last_line=launched", weight="2"];
+  LaunchLaneC -> InfraCarrier  [condition="context.tool.last_line=crashed"];
+
+  ParentVerifyC [
+    shape=parallelogram, label="Parent-Verify lane_c Candidate",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_c.json\"))\nif lane_result.get(\"result\") != \"candidate\":\n    print(\"skip:\" + lane_result.get(\"blocker_reason\", \"unknown\"))\nelse:\n    registry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\n    result = gpr.run_parent_verifier_envelope(\n        registry=registry, git_argv_prefix=(\"$git_bin\",), target_repo=\"$target_repo\",\n        worktree_root=\"$worktree_root\", worktree_id=\"candidate-lane_c\",\n        candidate_sha=lane_result[\"candidate_sha\"],\n        verifier_argv=[\"/bin/sh\", \"-c\", \"test -f SMOKE_MARKER_lane_c.txt && [ \\\"$(cat SMOKE_MARKER_lane_c.txt)\\\" = \\\"lane_c:ok\\\" ] && test -f SMOKE_MARKER_lane_a.txt && test -f SMOKE_MARKER_lane_b.txt\"],\n        timeout_seconds=30, output_root=\"$state_root/verify-out/candidate-lane_c\",\n        evidence_path=\"$state_root/evidence/candidate-lane_c.json\",\n    )\n    print(result.verdict)\nPYEOF"
+  ];
+  ParentVerifyC -> IntegrateC   [condition="context.tool.last_line=PASS", weight="2"];
+  ParentVerifyC -> InfraCarrier [condition="context.tool.last_line=INFRA"];
+  ParentVerifyC -> Residuals    [condition="context.tool.last_line=FAIL"];
+  ParentVerifyC -> Residuals    [condition="context.tool.last_line!=PASS"];
+
+  IntegrateC [
+    shape=parallelogram, label="Integrate lane_c (merge + aggregate)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nlane_result = json.load(open(\"$state_root/lane-results/lane_c.json\"))\njournal = gpr.IntegrationJournal(\"$state_root/integration-journal.json\", \"$state_root/integration-journal.lock\")\nentry = gpr.integrate_candidate(\n    git_argv_prefix=(\"$git_bin\",), integration_worktree=\"$target_repo\", journal=journal,\n    lane_id=\"lane_c\", candidate_sha=lane_result[\"candidate_sha\"],\n    aggregate_verifier_argv=[\"/bin/sh\", \"-c\", \"for f in lane_a lane_b lane_c; do test -f SMOKE_MARKER_$f.txt || exit 1; done\"],\n    aggregate_timeout_seconds=30, output_root=\"$state_root/verify-out/aggregate-after-lane_c\",\n    evidence_path=\"$state_root/evidence/aggregate-after-lane_c.json\",\n)\nprint(entry[\"result\"])\nPYEOF"
+  ];
+  IntegrateC -> PreCoherenceAggregate [condition="context.tool.last_line=ACCEPTED", weight="2"];
+  IntegrateC -> InfraCarrier          [condition="context.tool.last_line=AGGREGATE_INFRA"];
+  IntegrateC -> Residuals             [condition="context.tool.last_line=MERGE_CONFLICT"];
+  IntegrateC -> Residuals             [condition="context.tool.last_line=AGGREGATE_FAIL"];
+
+  // ---------------------------------------------------------------------
+  // Coherence, bounded correction, final sweep
+  // ---------------------------------------------------------------------
+
+  PreCoherenceAggregate [
+    shape=parallelogram, label="Pre-Coherence Aggregate",
+    tool_command="#!/bin/sh\nset -e\nfor f in lane_a lane_b lane_c; do test -f SMOKE_MARKER_$f.txt || { printf 'aggregate_fail'; exit 0; }; done\nprintf 'aggregate_ok'"
+  ];
+  PreCoherenceAggregate -> Coherence   [condition="context.tool.last_line=aggregate_ok", weight="2"];
+  PreCoherenceAggregate -> InfraCarrier [condition="context.tool.last_line=aggregate_fail"];
+
+  // LLM judgment node: a fresh cross-lane review, distinct from any single
+  // lane's own verification -- looks for interaction effects the
+  // per-lane/aggregate checks above cannot see (RUBRIC.md \u00a74
+  // "expensive model in the gate").
+  Coherence [
+    shape=box, fidelity="full",
+    label="Cross-Lane Coherence Review",
+    prompt="All three lanes (lane_a, lane_b, lane_c) are integrated and each SMOKE_MARKER_*.txt file is present and independently verified. Review the integrated state for any cross-lane interaction defect (e.g. an unintended conflict pattern between the three marker files, anything that looks inconsistent across lanes). This is a real smoke test with a deliberately trivial per-lane task, so in the overwhelmingly common case there is nothing to find -- do NOT invent a finding to justify a correction. Write .resolve/coherence/review.json with {\"finding\": true|false, \"description\": \"...\"}. Print the single line: reviewed"
+  ];
+  Coherence -> CoherenceCheck;
+
+  CoherenceCheck [
+    shape=parallelogram, label="Coherence Check",
+    tool_command="#!/bin/sh\nset -e\nfinding=$(python3 -c \"import json;print(json.load(open('.resolve/coherence/review.json'))['finding'])\" 2>/dev/null || echo False)\nif [ \"$finding\" = \"True\" ]; then printf 'finding'; else printf 'no_finding'; fi"
+  ];
+  CoherenceCheck -> Correction  [condition="context.tool.last_line=finding"];
+  CoherenceCheck -> FinalFreeze [condition="context.tool.last_line=no_finding", weight="2"];
+
+  // Bounded correction round: launches subgraphs/integration_correction.dot
+  // as its own supervised child, exactly like a lane launch (Task 8).
+  Correction [
+    shape=parallelogram, label="Launch Integration Correction (bounded, 1 round)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys, json, subprocess, os, hashlib\nsys.path.insert(0, \"$runtime_py_dir\")\nintegration_head = subprocess.run([\"$git_bin\", \"rev-parse\", \"HEAD\"], cwd=\"$target_repo\", capture_output=True, text=True, check=True).stdout.strip()\nbranch = subprocess.run([\"$git_bin\", \"rev-parse\", \"--abbrev-ref\", \"HEAD\"], cwd=\"$target_repo\", capture_output=True, text=True, check=True).stdout.strip()\nwith open(\"$state_root/aggregate_verifier_argv.json\", \"w\") as f:\n    json.dump([\"/bin/sh\", \"-c\", \"for f in lane_a lane_b lane_c; do test -f SMOKE_MARKER_$f.txt || exit 1; done\"], f)\ncontract = {\n    \"schema_version\": \"goal-plan.process-launch-contract/v1\",\n    \"process_kind\": \"correction\", \"process_id\": \"integration_correction\", \"process_run_id\": \"$run_id-correction\",\n    \"child_argv\": [\"python3\", \"-m\", \"amplifier_module_pipeline_runner.cli\", \"run\",\n                   \"$subgraphs_dir/integration_correction.dot\", \"--cwd\", \".\", \"--on-human-gate\", \"fail\",\n                   \"--param\", \"integration_branch=\" + branch,\n                   \"--param\", \"allowed_paths_csv=lane_a,lane_b,lane_c\",\n                   \"--param\", \"runtime_py_dir=$runtime_py_dir\",\n                   \"--param\", \"ledger_path=$state_root/budgets/correction.json\",\n                   \"--param\", \"ledger_lock_path=$state_root/budgets/correction.lock\",\n                   \"--param\", \"run_id=$run_id\",\n                   \"--param\", \"aggregate_verifier_argv_json=$state_root/aggregate_verifier_argv.json\",\n                   \"--param\", \"output_root=$state_root/verify-out/correction\",\n                   \"--param\", \"evidence_path=$state_root/evidence/correction.json\",\n                   \"--param\", \"correction_result_path=$state_root/lane-results/correction.json\"],\n    \"child_cwd\": \"$target_repo\", \"child_env\": {\"PYTHONPATH\": \"$runner_pythonpath\"},\n    \"wall_timeout_seconds\": 600, \"term_grace_seconds\": 10,\n    \"stdout_path\": \"$state_root/logs/correction.stdout\", \"stderr_path\": \"$state_root/logs/correction.stderr\",\n}\nwith open(\"$state_root/contracts/correction.json\", \"w\") as f:\n    json.dump(contract, f, sort_keys=True)\ncontract_sha = hashlib.sha256(open(\"$state_root/contracts/correction.json\", \"rb\").read()).hexdigest()\nintent = {\"schema_version\": \"goal-plan.launch-intent/v1\", \"process_run_id\": \"$run_id-correction\", \"contract_sha256\": contract_sha}\nwith open(\"$state_root/contracts/correction.intent.json\", \"w\") as f:\n    json.dump(intent, f, sort_keys=True)\nrc = subprocess.run([\"python3\", \"$runtime_py_dir/goal_plan_supervisor.py\", \"run\",\n    \"--contract\", \"$state_root/contracts/correction.json\", \"--intent\", \"$state_root/contracts/correction.intent.json\",\n    \"--ledger\", \"$state_root/supervisor-ledger.json\", \"--ack\", \"$state_root/acks/correction.json\",\n    \"--result\", \"$state_root/results/correction.json\"])\nsup = json.load(open(\"$state_root/results/correction.json\")) if rc.returncode == 0 and os.path.exists(\"$state_root/results/correction.json\") else {}\nif sup.get(\"verdict\") != \"EXITED\" or sup.get(\"normalized_exit_code\") != 0:\n    print(\"crashed\"); sys.exit(0)\nresult = json.load(open(\"$state_root/lane-results/correction.json\"))\nprint(result.get(\"result\", \"crashed\"))\nPYEOF"
+  ];
+  Correction -> AffectedClosureAggregate [condition="context.tool.last_line=corrected", weight="2"];
+  Correction -> Residuals                [condition="context.tool.last_line=blocked"];
+  Correction -> InfraCarrier             [condition="context.tool.last_line=crashed"];
+
+  AffectedClosureAggregate [
+    shape=parallelogram, label="Affected-Closure + Fresh Coherence Aggregate",
+    tool_command="#!/bin/sh\nset -e\nfor f in lane_a lane_b lane_c; do test -f SMOKE_MARKER_$f.txt || { printf 'aggregate_fail'; exit 0; }; done\nprintf 'aggregate_ok'"
+  ];
+  AffectedClosureAggregate -> FinalFreeze [condition="context.tool.last_line=aggregate_ok", weight="2"];
+  AffectedClosureAggregate -> InfraCarrier [condition="context.tool.last_line=aggregate_fail"];
+
+  // Freeze one final HEAD, rerun every lane's deterministic verifier there
+  // (final lane sweep -- NOT the full goal_lane.dot convergence loop; the
+  // sweep proves the frozen state still satisfies each lane's own
+  // verifier, it does not re-attempt new work), then one
+  // final-aggregate-after-sweep gate.
+  FinalFreeze [
+    shape=parallelogram, label="Freeze Final HEAD + Lane Sweep",
+    tool_command="#!/bin/sh\nset -e\nfinal_head=$($git_bin rev-parse HEAD)\nprintf '%s' \"$final_head\" > \"$state_root/final_head.txt\"\nfor f in lane_a lane_b lane_c; do\n  test -f SMOKE_MARKER_$f.txt && grep -qF -e \"$f:ok\" -- SMOKE_MARKER_$f.txt || { printf 'sweep_fail'; exit 0; }\ndone\nprintf 'sweep_ok'"
+  ];
+  FinalFreeze -> FinalAggregateAfterSweep [condition="context.tool.last_line=sweep_ok", weight="2"];
+  FinalFreeze -> InfraCarrier             [condition="context.tool.last_line=sweep_fail"];
+
+  FinalAggregateAfterSweep [
+    shape=parallelogram, label="Final Aggregate After Sweep",
+    tool_command="#!/bin/sh\nset -e\nfor f in lane_a lane_b lane_c; do test -f SMOKE_MARKER_$f.txt || { printf 'aggregate_fail'; exit 0; }; done\nprintf 'aggregate_ok'"
+  ];
+  FinalAggregateAfterSweep -> DeliveryGate [condition="context.tool.last_line=aggregate_ok", weight="2"];
+  FinalAggregateAfterSweep -> InfraCarrier [condition="context.tool.last_line=aggregate_fail"];
+
+  // ---------------------------------------------------------------------
+  // Delivery (optional -- reachable only from the fully green final HEAD)
+  // ---------------------------------------------------------------------
+
+  DeliveryGate [
+    shape=parallelogram, label="Delivery Enabled?",
+    tool_command="#!/bin/sh\nset -e\nif [ \"$delivery_enabled\" = \"true\" ]; then printf 'deliver'; else printf 'skip_delivery'; fi"
+  ];
+  DeliveryGate -> Deliver         [condition="context.tool.last_line=deliver", weight="2"];
+  DeliveryGate -> PreTerminalCleanup [condition="context.tool.last_line=skip_delivery"];
+
+  Deliver [
+    shape=folder, label="Deliver PR (subgraph)",
+    dot_file="subgraphs/deliver_pr.dot",
+    outputs="delivery.pr_url,delivery.result"
+  ];
+  // Route on the delivery subgraph's REPORTED result, not its run_subgraph
+  // outcome (a folder subgraph returns SUCCESS even when its internal Failed
+  // node ran -- RUBRIC.md 2 / 3.7). An unconditional edge here let a FAILED
+  // delivery (no PR) still reach COMPLETE. delivery.result is merged back via
+  // outputs= and deliver_pr.dot always sets it to "opened"|"failed", so both
+  // edges are reachable; a failed delivery routes to Residuals (RESIDUALS_READY),
+  // never COMPLETE.
+  Deliver -> PreTerminalCleanup [condition="context.delivery.result=opened", weight="2"];
+  Deliver -> Residuals          [condition="context.delivery.result=failed"];
+
+  // ---------------------------------------------------------------------
+  // Cleanup + terminals
+  // ---------------------------------------------------------------------
+
+  // Recomputes current authority and reconciles processes/worktrees before
+  // any terminal is published -- runs on EVERY path that reaches here
+  // (green or not), never assumed clean by default.
+  PreTerminalCleanup [
+    shape=parallelogram, label="Pre-Terminal Cleanup",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nregistry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\nauthority = gpr.derive_cleanup_authority(trusted_runtime_verdict=\"PASS\", parent_binding_verdict=\"PASS\")\nrecord = gpr.pre_terminal_cleanup(\n    registry=registry, git_argv_prefix=(\"$git_bin\",), target_repo=\"$target_repo\",\n    authority=authority, result_path=\"$state_root/cleanup-result.json\",\n)\nprint(\"cleaned\")\nPYEOF"
+  ];
+  PreTerminalCleanup -> Complete;
+
+  Complete [
+    shape=parallelogram, label="Complete",
+    tool_command="printf '{\"terminal.status\": \"COMPLETE\"}'",
+    parse_json="true"
+  ];
+  Complete -> CompleteCarrier;
+
+  Residuals [
+    shape=parallelogram, label="Residuals (named, evidence-backed)",
+    tool_command="printf '{\"terminal.status\": \"RESIDUALS_READY\"}'",
+    parse_json="true"
+  ];
+  Residuals -> ResidualsCleanup;
+  ResidualsCleanup [
+    shape=parallelogram, label="Pre-Terminal Cleanup (residuals path)",
+    tool_command="#!/bin/sh\nset -e\npython3 - <<'PYEOF'\nimport sys\nsys.path.insert(0, \"$runtime_py_dir\")\nimport goal_plan_runtime as gpr\nregistry = gpr.WorktreeRegistry(\"$state_root/run-owned-worktrees.json\", \"$state_root/run-owned-worktrees.lock\")\nauthority = gpr.derive_cleanup_authority(trusted_runtime_verdict=\"PASS\", parent_binding_verdict=\"PASS\")\ngpr.pre_terminal_cleanup(\n    registry=registry, git_argv_prefix=(\"$git_bin\",), target_repo=\"$target_repo\",\n    authority=authority, result_path=\"$state_root/cleanup-result-residuals.json\",\n)\nprint(\"cleaned\")\nPYEOF"
+  ];
+  ResidualsCleanup -> ResidualsCarrier;
+
+  CompleteCarrier [
+    shape=parallelogram, label="CompleteCarrier",
+    tool_command="printf 'COMPLETE'"
+  ];
+  CompleteCarrier -> Exit;
+
+  ResidualsCarrier [
+    shape=parallelogram, label="ResidualsCarrier",
+    tool_command="printf 'RESIDUALS_READY'"
+  ];
+  ResidualsCarrier -> Exit;
+
+  InfraCarrier [
+    shape=parallelogram, label="InfraCarrier",
+    tool_command="printf 'INFRA_FAILURE'"
+  ];
+  InfraCarrier -> Exit;
+
+  AbortedCarrier [
+    shape=parallelogram, label="AbortedCarrier",
+    tool_command="printf 'ABORTED'"
+  ];
+  AbortedCarrier -> Exit;
+}

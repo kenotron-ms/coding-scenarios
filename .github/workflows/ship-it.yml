@@ -1,0 +1,207 @@
+# Ship It — execute an approved batch plan on the runner.
+#
+# Trigger (BOTH accepted):
+#   - a comment beginning `/ship-it` on the issue, OR
+#   - adding the `ship-it` label to the issue.
+# In either case the actor must have write access, AND the `batch-execute`
+# GitHub Environment (configured with required reviewers) must be approved.
+#
+# It resolves the plan branch that plan-batch.yml posted, checks it out at that
+# exact commit, RE-COMPILES the plan and asserts the committed parent .dot is
+# byte-identical (anti-tamper — the compiler is deterministic), then runs the
+# compiled goal_plan pipeline in --light trust mode against this repo.
+#
+# SECURITY: a lane's `verifier_argv` is arbitrary argv that EXECUTES on the
+# runner. Three gates guard that: (1) the actor must be a write collaborator,
+# (2) the `batch-execute` environment forces a maintainer approval click, and
+# (3) the anti-tamper recompile rejects any hand-edited branch. `issue_comment`
+# runs in the base-branch context with write perms, so gate (1) is mandatory.
+
+name: Ship It
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ship-it-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    # Real issues only (not PR comments); /ship-it comment OR ship-it label.
+    if: >-
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request == null &&
+       startsWith(github.event.comment.body, '/ship-it')) ||
+      (github.event_name == 'issues' &&
+       github.event.label.name == 'ship-it')
+    runs-on: ubuntu-latest
+    environment: batch-execute # required-reviewer gate — human approval before any execution
+    steps:
+      # GATE 1 — the actor must have write/maintain/admin on the repo.
+      - name: Authorize actor
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const actor = context.eventName === 'issue_comment'
+              ? context.payload.comment.user.login
+              : context.payload.sender.login;
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              ...context.repo, username: actor });
+            if (!['write', 'maintain', 'admin'].includes(data.permission)) {
+              core.setFailed(`@${actor} lacks write access (has '${data.permission}'). Refusing to execute.`);
+            } else {
+              core.info(`Authorized @${actor} (${data.permission}).`);
+            }
+
+      # Resolve the plan branch from the most recent plan-batch review comment.
+      - name: Resolve plan branch
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const matches = comments
+              .map(c => (c.body || '').match(/Branch:\s*`([^`]+)`/))
+              .filter(Boolean);
+            if (matches.length === 0) core.setFailed('No plan branch found on this issue — run plan-batch first.');
+            const branch = matches[matches.length - 1][1];
+            const runId = branch.split('-').pop();
+            core.setOutput('branch', branch);
+            core.setOutput('run_id', runId);
+            core.setOutput('outdir', `generated/plans/${runId}`);
+            core.info(`Plan branch: ${branch}`);
+
+      - name: Checkout plan branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.branch }}
+          fetch-depth: 0
+
+      # A managed Python so `pip install` works (PEP 668 blocks the OS python on
+      # ubuntu-latest) and bare `python3` on PATH is the one the engine installs into.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The engine shells out to `uv` at runtime to materialize child sessions and
+      # resolve child-module deps; without it lanes die with FileNotFoundError: 'uv'.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      # GATE 3 — anti-tamper. The compiler is deterministic (same plan -> byte
+      # identical .dot), so a recompile that differs means the branch was edited.
+      - name: Verify plan integrity
+        run: |
+          set -euo pipefail
+          OUTDIR="${{ steps.resolve.outputs.outdir }}"
+          test -f "$OUTDIR/plan.json" || { echo "::error::missing $OUTDIR/plan.json"; exit 1; }
+          test -f "$OUTDIR/goal_plan.dot" || { echo "::error::missing $OUTDIR/goal_plan.dot"; exit 1; }
+          python3 -m compiler "$OUTDIR/plan.json" -o /tmp/recompiled.dot
+          if ! diff -u "$OUTDIR/goal_plan.dot" /tmp/recompiled.dot; then
+            echo "::error::committed goal_plan.dot does not match a fresh recompile of plan.json — refusing (tamper check)."
+            exit 1
+          fi
+          echo "Integrity OK: committed .dot matches plan.json."
+
+      # Bootstrap the attractor engine so lane child-processes can launch
+      # `python3 -m amplifier_module_pipeline_runner.cli`. The runner CLI lives in
+      # amplifier-bundle-attractor's modules/pipeline-runner (NOT modules/loop-pipeline,
+      # which provides only the amplifier_module_loop_pipeline engine); installing the
+      # runner pulls in the loop-pipeline engine via its own git dependency. Verified in
+      # a clean venv: this install makes `import amplifier_module_pipeline_runner.cli`
+      # succeed. Fails LOUD if the import is unavailable.
+      - name: Bootstrap attractor engine
+        id: engine
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet \
+            "amplifier-module-pipeline-runner @ git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/pipeline-runner"
+          if ! python3 -c "import amplifier_module_pipeline_runner.cli" 2>/dev/null; then
+            echo "::error::attractor runner (amplifier_module_pipeline_runner) not importable after install."
+            exit 1
+          fi
+          echo "pp=$(python3 -c 'import site; print(site.getsitepackages()[0])')" >> "$GITHUB_OUTPUT"
+
+      # Execute the compiled batch in --light trust mode (running the parent .dot
+      # directly via the pipeline-runner IS light mode — no bootstrap descriptor).
+      # State/worktree/delivery roots live OUTSIDE the checkout, under $RUNNER_TEMP.
+      - name: Run batch
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          OUTDIR="${{ steps.resolve.outputs.outdir }}"
+          RUN_ID="${{ steps.resolve.outputs.run_id }}"
+          WORK="$RUNNER_TEMP/goal-plan-$RUN_ID"
+          mkdir -p "$WORK/state" "$WORK/worktrees" "$WORK/delivery" "$WORK/logs"
+          echo "logs_dir=$WORK/logs" >> "$GITHUB_OUTPUT"
+          git fetch --quiet origin main || true
+          BASE_SHA="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD)"
+          RUN_OUT="$WORK/run.out"
+          python3 -m amplifier_module_pipeline_runner.cli run "$OUTDIR/goal_plan.dot" \
+            --cwd "$GITHUB_WORKSPACE" \
+            --logs-root "$WORK/logs" \
+            --on-human-gate fail \
+            --param target_repo="$GITHUB_WORKSPACE" \
+            --param repo="${{ github.repository }}" \
+            --param run_id="$RUN_ID" \
+            --param product_base_sha="$BASE_SHA" \
+            --param state_root="$WORK/state" \
+            --param worktree_root="$WORK/worktrees" \
+            --param delivery_state_root="$WORK/delivery" \
+            --param delivery_enabled="true" \
+            --param runtime_py_dir="$GITHUB_WORKSPACE/pipelines/goal_plan_smoke/python" \
+            --param subgraphs_dir="$GITHUB_WORKSPACE/pipelines/goal_plan_smoke/subgraphs" \
+            --param git_bin="git" \
+            --param runner_pythonpath="${{ steps.engine.outputs.pp }}" \
+            --param plan_json_path="$OUTDIR/plan.json" \
+            --param parent_dot_path="$OUTDIR/goal_plan.dot" 2>&1 | tee "$RUN_OUT"
+          rc=${PIPESTATUS[0]}
+          terminal="$(grep -oaE 'COMPLETE|RESIDUALS_READY|INFRA_FAILURE|ABORTED|PRELAUNCH_INFRASTRUCTURE_BLOCKED' "$RUN_OUT" | tail -1 || true)"
+          pr_url="$(grep -oaE 'https://github.com/[^[:space:]]+/pull/[0-9]+' "$RUN_OUT" | tail -1 || true)"
+          {
+            echo "terminal=${terminal:-unknown}"
+            echo "pr_url=${pr_url}"
+          } >> "$GITHUB_OUTPUT"
+          echo "attractor terminal: ${terminal:-unknown} | pr_url: ${pr_url:-none} | rc: $rc"
+          exit "$rc"
+
+      - name: Upload run logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attractor-run-logs-${{ steps.resolve.outputs.run_id }}
+          path: ${{ steps.run.outputs.logs_dir }}
+          if-no-files-found: warn
+
+      - name: Report result to issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.run.outcome }}';
+            const runId = '${{ steps.resolve.outputs.run_id }}';
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const emoji = status === 'success' ? '🚀' : '❌';
+            const body = [
+              `${emoji} **Batch \`${runId}\` execution: ${status}.**`,
+              '',
+              `[View the run](${url}) for per-lane terminals (COMPLETE / RESIDUALS_READY /`,
+              `INFRA_FAILURE / ABORTED) and any delivered PRs.`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              ...context.repo, issue_number: context.issue.number, body });
