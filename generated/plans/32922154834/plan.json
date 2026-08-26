@@ -1,0 +1,57 @@
+{
+  "plan_id": "issue_1",
+  "description": "Move reference solutions for L0-L4 scenarios out of the scenario tree into a top-level graders/references/ directory, so agents cannot read ground-truth solutions from the repo tree, while keeping the deterministic runner able to grade against them. Wave 1 physically relocates the reference dirs and updates .gitignore. Wave 2 updates all docs, scripts, and comments that cite the old paths.",
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  },
+  "lanes": {
+    "relocate_refs": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32922154834/goals/relocate_refs.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test ! -d scenarios/L0-roman-numerals/reference && test ! -d scenarios/L1-csv-parser/reference && test ! -d scenarios/L2-lru-cache/reference && test ! -d scenarios/L3-log-analyzer/reference && test ! -d scenarios/L4-template-engine/reference && test -f graders/references/L0-roman-numerals/solution/roman.py && test -f graders/references/L1-csv-parser/solution/csvparse.py && test -f graders/references/L2-lru-cache/solution/lru.py && test -f graders/references/L3-log-analyzer/solution/loganalyze.py && test -d graders/references/L4-template-engine/solution/template_engine"
+      ],
+      "marker_file": "artifacts/relocate_refs.done",
+      "marker_content": "relocate_refs:ok"
+    },
+    "update_path_refs": {
+      "wave": 2,
+      "depends_on": [
+        "relocate_refs"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32922154834/goals/update_path_refs.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "! grep -rn 'scenarios/L[0-4][^/]*/reference/' --include='*.py' --include='*.md' --include='*.yaml' --include='*.yml' framework/ README.md 2>/dev/null | grep -v '^Binary'"
+      ],
+      "marker_file": "artifacts/update_path_refs.done",
+      "marker_content": "update_path_refs:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    },
+    {
+      "wave": 2
+    }
+  ],
+  "integration_order": [
+    "relocate_refs",
+    "update_path_refs"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ]
+}
