@@ -1,0 +1,38 @@
+{
+  "plan_id": "issue_29",
+  "description": "Single-lane plan: create REMOTE_DOGFOOD.md at the repo root containing exactly one line: remote-ok. This issue requires only one lane as it is a single atomic file creation task.",
+  "lanes": {
+    "add-remote-dogfood": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/33000169530/goals/add-remote-dogfood.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f REMOTE_DOGFOOD.md && grep -qx 'remote-ok' REMOTE_DOGFOOD.md"
+      ],
+      "marker_file": "artifacts/add-remote-dogfood.done",
+      "marker_content": "add-remote-dogfood:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    }
+  ],
+  "integration_order": [
+    "add-remote-dogfood"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
