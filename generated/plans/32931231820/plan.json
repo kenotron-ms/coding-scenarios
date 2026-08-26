@@ -1,0 +1,93 @@
+{
+  "plan_id": "issue_14",
+  "description": "L6 Kanban App: full-stack kanban application with Python/FastAPI backend, React/TypeScript frontend, drag-and-drop with keyboard alternative, WCAG 2.1 AA accessibility, and required design artifacts.",
+  "lanes": {
+    "design_artifacts": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931231820/goals/design_artifacts.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L6-kanban-app/solution/DECISIONS.md && test -f scenarios/L6-kanban-app/design/personas.md && test -f scenarios/L6-kanban-app/design/prd.md && test -f scenarios/L6-kanban-app/design/user-stories.md && test -f scenarios/L6-kanban-app/design/backlog.md && test -f scenarios/L6-kanban-app/design/research/interviews.md && test -f scenarios/L6-kanban-app/design/research/jtbd.md && test -f scenarios/L6-kanban-app/design/interaction-specs.md && test -f scenarios/L6-kanban-app/design/a11y-annotations.md && test -f scenarios/L6-kanban-app/design/design-tokens.json && test -f scenarios/L6-kanban-app/design/tokens.css"
+      ],
+      "marker_file": "artifacts/design_artifacts.done",
+      "marker_content": "design_artifacts:ok"
+    },
+    "backend_core": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931231820/goals/backend_core.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L6-kanban-app/solution/backend/requirements.txt && test -f scenarios/L6-kanban-app/solution/backend/app/main.py && test -f scenarios/L6-kanban-app/solution/backend/app/models.py && test -f scenarios/L6-kanban-app/solution/backend/app/ordering.py && test -f scenarios/L6-kanban-app/solution/backend/app/auth.py && cd scenarios/L6-kanban-app && pip install -q -r solution/backend/requirements.txt && python -m pytest tests/smoke/ -q --tb=short 2>&1 | grep -qE '(passed|no tests ran)'"
+      ],
+      "marker_file": "artifacts/backend_core.done",
+      "marker_content": "backend_core:ok"
+    },
+    "frontend_core": {
+      "wave": 2,
+      "depends_on": [
+        "backend_core"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931231820/goals/frontend_core.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L6-kanban-app/solution/frontend/src/api/client.ts && test -f scenarios/L6-kanban-app/solution/frontend/src/types/api.ts && test -f scenarios/L6-kanban-app/solution/frontend/src/store/boardStore.ts && test -f scenarios/L6-kanban-app/solution/frontend/src/store/authStore.ts && test -f scenarios/L6-kanban-app/solution/frontend/src/styles/tokens.css && cd scenarios/L6-kanban-app/solution/frontend && npm ci --silent && npx tsc --noEmit 2>&1 | tee /tmp/tsc_out.txt; lines=$(wc -l < /tmp/tsc_out.txt); test $lines -eq 0"
+      ],
+      "marker_file": "artifacts/frontend_core.done",
+      "marker_content": "frontend_core:ok"
+    },
+    "integration_e2e": {
+      "wave": 3,
+      "depends_on": [
+        "backend_core",
+        "frontend_core",
+        "design_artifacts"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931231820/goals/integration_e2e.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L6-kanban-app/solution/run.sh && test -f scenarios/L6-kanban-app/solution/seed.py && test -x scenarios/L6-kanban-app/solution/run.sh && test -f scenarios/L6-kanban-app/solution/README.md && grep -q 'alice@example.com' scenarios/L6-kanban-app/solution/seed.py && grep -q 'bob@example.com' scenarios/L6-kanban-app/solution/seed.py"
+      ],
+      "marker_file": "artifacts/integration_e2e.done",
+      "marker_content": "integration_e2e:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1,
+      "concurrency": 2
+    },
+    {
+      "wave": 2
+    },
+    {
+      "wave": 3
+    }
+  ],
+  "integration_order": [
+    "design_artifacts",
+    "backend_core",
+    "frontend_core",
+    "integration_e2e"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
