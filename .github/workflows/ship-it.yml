@@ -144,6 +144,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
+          # Lane worktrees run `git commit`; GitHub runners have no git identity by
+          # default, so a lane's Candidate commit dies with "Author identity unknown".
+          git config --global user.email "amplifier-bot@users.noreply.github.com"
+          git config --global user.name "Amplifier Bot"
           OUTDIR="${{ steps.resolve.outputs.outdir }}"
           RUN_ID="${{ steps.resolve.outputs.run_id }}"
           WORK="$RUNNER_TEMP/goal-plan-$RUN_ID"
