@@ -1,0 +1,258 @@
+openapi: "3.0.3"
+info:
+  title: URL Shortener API
+  description: >
+    A self-hosted REST service that shortens URLs, redirects short codes to their
+    targets, tracks click statistics, and provides durable persistence with
+    concurrency-safe click counting.
+  version: "1.0.0"
+
+servers:
+  - url: "http://127.0.0.1:{port}"
+    description: Local development server
+    variables:
+      port:
+        default: "8000"
+
+paths:
+  /api/shorten:
+    post:
+      operationId: shortenUrl
+      summary: Create a short URL
+      description: >
+        Accepts a JSON body containing a valid http/https URL. Returns 201 with
+        the generated short code and an absolute short URL.
+
+        A-1 (Idempotency): POSTing the same URL twice returns the same code
+        (201 both times). Clicks are preserved and not reset. Deduplication
+        keys on the verbatim stored URL.
+
+        A-3 (Normalization): URLs are stored verbatim — no normalization applied.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  description: >
+                    The destination URL to shorten. Must use http or https scheme,
+                    must have a host, must not exceed 2048 bytes, and must not
+                    contain CR, LF, or NUL characters.
+                  example: "https://example.com/a/very/long/path?utm_source=email"
+      responses:
+        "201":
+          description: Short URL created (or existing code returned for duplicate URL)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortenResponse"
+        "400":
+          description: >
+            Invalid request — non-JSON body, missing or invalid url field,
+            forbidden scheme, no host, oversized URL or body, or control
+            characters in URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
+  /{code}:
+    get:
+      operationId: redirectCode
+      summary: Redirect to the stored URL
+      description: >
+        Returns a 302 redirect to the target URL stored for the given code.
+        Each successful redirect increments the click counter atomically.
+        Unknown codes return 404.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-Za-z]{6}$'
+          description: The 6-character base62 short code
+          example: "aB3xK9"
+      responses:
+        "302":
+          description: Redirect to the target URL
+          headers:
+            Location:
+              description: >
+                The stored target URL, byte-identical to the URL submitted at
+                creation time (A-3: no normalization applied).
+              schema:
+                type: string
+                format: uri
+        "404":
+          description: Code not found or deleted
+
+  /api/stats/{code}:
+    get:
+      operationId: getStats
+      summary: Get statistics for a short code
+      description: >
+        Returns the stored URL, the code, the current click count, and the
+        creation timestamp for the given code. Click counts are read from the
+        datastore and reflect every redirect that has already returned a
+        response to a client.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-Za-z]{6}$'
+          description: The 6-character base62 short code
+          example: "aB3xK9"
+      responses:
+        "200":
+          description: Stats for the requested code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+        "404":
+          description: Code not found or deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
+  /api/{code}:
+    delete:
+      operationId: deleteCode
+      summary: Delete a short URL
+      description: >
+        Removes the link for the given code. After deletion, GET /{code}
+        returns 404, GET /api/stats/{code} returns 404, and a second
+        DELETE /api/{code} also returns 404.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-Za-z]{6}$'
+          description: The 6-character base62 short code
+          example: "aB3xK9"
+      responses:
+        "204":
+          description: Code deleted successfully (empty body)
+        "404":
+          description: Code not found or already deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: >
+        Returns 200 with {"status": "ok"} if the service is healthy and the
+        datastore is reachable. Requires no authentication. Succeeds on a
+        brand-new empty database. Actually touches the datastore (a health
+        check that cannot fail is not a health check).
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "405":
+          description: Method not allowed
+        "503":
+          description: Service unavailable (datastore unreachable)
+
+components:
+  schemas:
+    ShortenResponse:
+      type: object
+      required:
+        - code
+        - short_url
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9A-Za-z]{6}$'
+          description: >
+            The 6-character base62 short code. Fixed length 6, alphabet
+            [0-9A-Za-z] (A-2 resolution). Stable for the life of the link.
+          example: "aB3xK9"
+        short_url:
+          type: string
+          format: uri
+          description: >
+            Absolute URL whose path is exactly /{code}. Constructed from
+            URLSHORT_BASE_URL if set, otherwise derived from the request
+            Host header.
+          example: "http://127.0.0.1:8000/aB3xK9"
+
+    StatsResponse:
+      type: object
+      required:
+        - url
+        - code
+        - clicks
+        - created_at
+      properties:
+        url:
+          type: string
+          format: uri
+          description: >
+            The stored target URL, verbatim as submitted (A-3: no normalization).
+          example: "https://example.com/a/very/long/path?utm_source=email"
+        code:
+          type: string
+          pattern: '^[0-9A-Za-z]{6}$'
+          description: The 6-character base62 short code.
+          example: "aB3xK9"
+        clicks:
+          type: integer
+          minimum: 0
+          description: >
+            Number of successful redirects (302 responses) for this code.
+            Monotonic non-decreasing for a live code. Read from the datastore,
+            never from an in-process counter.
+          example: 7
+        created_at:
+          type: string
+          format: date-time
+          description: >
+            ISO-8601 UTC timestamp of when the link was created.
+            Parseable by datetime.fromisoformat().
+          example: "2026-08-24T18:04:11Z"
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Health status string.
+          example: "ok"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message describing the problem.
+          example: "url scheme must be http or https"
