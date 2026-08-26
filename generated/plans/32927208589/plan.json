@@ -1,0 +1,38 @@
+{
+  "plan_id": "issue_12",
+  "description": "Implement the L4 Template Engine scenario solution: a multi-module templating library (lexer -> parser -> renderer) with a public API and autoescape, so the acceptance suite passes at >= 95%.",
+  "lanes": {
+    "core_engine": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32927208589/goals/core_engine.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L4-template-engine && SOLUTION_DIR=$(pwd)/solution PYTHONPATH=$(pwd)/solution pytest tests/smoke tests/acceptance -q --tb=no 2>&1 | grep -E 'passed|failed|error' | tail -3 && cd scenarios/L4-template-engine && SOLUTION_DIR=$(pwd)/solution PYTHONPATH=$(pwd)/solution python -c \"import sys; sys.path.insert(0,'solution'); from template_engine import Template, Environment, TemplateError, TemplateSyntaxError, TemplateRuntimeError; print('imports ok')\""
+      ],
+      "marker_file": "artifacts/core_engine.done",
+      "marker_content": "core_engine:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    }
+  ],
+  "integration_order": [
+    "core_engine"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
