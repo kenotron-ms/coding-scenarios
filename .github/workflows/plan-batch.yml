@@ -51,7 +51,7 @@ jobs:
       # pinned commit SHA.
       - name: Prepare goal-plan
         id: plan
-        uses: kenotron-ms/attractor-pipelines/.github/actions/goal-plan/prepare@83776af
+        uses: kenotron-ms/attractor-pipelines/.github/actions/goal-plan/prepare@83776af2c24f384fda85bc03585f0f7a06b99365
         with:
           issue_number: ${{ github.event.issue.number }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}

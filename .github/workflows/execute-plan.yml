@@ -93,7 +93,7 @@ jobs:
       # goal-plan/execute action, referenced here by pinned commit SHA.
       - name: Run goal-plan
         id: run
-        uses: kenotron-ms/attractor-pipelines/.github/actions/goal-plan/execute@83776af
+        uses: kenotron-ms/attractor-pipelines/.github/actions/goal-plan/execute@83776af2c24f384fda85bc03585f0f7a06b99365
         with:
           outdir: ${{ steps.resolve.outputs.outdir }}
           run_id: ${{ steps.resolve.outputs.run_id }}
