@@ -1,0 +1,38 @@
+{
+  "plan_id": "issue_8",
+  "description": "Implement the L0 Roman numerals scenario solution: a single-module roman.py with to_roman and from_roman pure functions that pass the acceptance gate.",
+  "lanes": {
+    "implement_roman": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32927201855/goals/implement_roman.goal.md",
+      "verifier_argv": [
+        "pytest",
+        "scenarios/L0-roman-numerals/tests/acceptance",
+        "-q"
+      ],
+      "marker_file": "artifacts/implement_roman.done",
+      "marker_content": "implement_roman:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    }
+  ],
+  "integration_order": [
+    "implement_roman"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
