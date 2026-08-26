@@ -1,0 +1,54 @@
+[project]
+name = "amplifier-module-loop-agent"
+version = "0.1.0"
+description = "Attractor coding agent loop orchestrator for Amplifier"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Microsoft MADE:Explorations Team" },
+]
+dependencies = [
+    "amplifier-core>=0.1.0",
+    # Direct git reference (not a bare name) so the dependency resolves even
+    # when the foundation activator installs with `--no-sources`, which strips
+    # the `[tool.uv.sources]` path override below. The package is vendored
+    # in-repo and unpublished (renamed in #50 to avoid a PyPI name collision);
+    # a direct reference keeps that collision-avoidance (uv never queries an
+    # index for the name) while surviving `--no-sources`. The path source is
+    # retained below for local editable development.
+    "amplifier-unified-llm-client @ git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/unified-llm-client",
+]
+
+[project.entry-points."amplifier.modules"]
+loop-agent = "amplifier_module_loop_agent:mount"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+amplifier-unified-llm-client = { path = "../unified-llm-client" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["amplifier_module_loop_agent"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "amplifier-core",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=1.0.0",
+]
+
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+asyncio_mode = "strict"
+pythonpath = [".", "../unified-llm-client"]
