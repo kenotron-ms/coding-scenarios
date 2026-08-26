@@ -149,6 +149,7 @@ jobs:
           WORK="$RUNNER_TEMP/goal-plan-$RUN_ID"
           mkdir -p "$WORK/state" "$WORK/worktrees" "$WORK/delivery" "$WORK/logs"
           echo "logs_dir=$WORK/logs" >> "$GITHUB_OUTPUT"
+          echo "state_dir=$WORK/state" >> "$GITHUB_OUTPUT"
           git fetch --quiet origin main || true
           BASE_SHA="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD)"
           RUN_OUT="$WORK/run.out"
@@ -185,7 +186,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: attractor-run-logs-${{ steps.resolve.outputs.run_id }}
-          path: ${{ steps.run.outputs.logs_dir }}
+          path: |
+            ${{ steps.run.outputs.logs_dir }}
+            ${{ steps.run.outputs.state_dir }}
           if-no-files-found: warn
 
       - name: Report result to issue
