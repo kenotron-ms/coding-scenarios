@@ -77,7 +77,7 @@ digraph integration_correction {
 
   Candidate [
     shape=parallelogram, label="Commit Correction",
-    tool_command="#!/bin/sh\nset -e\ngit add -A\ngit commit --quiet -m \"goal_plan_smoke(integration_correction): bounded coherence fix\"\nsha=$(git rev-parse HEAD)\nprintf '{\"result\": \"corrected\", \"candidate_sha\": \"%s\"}' \"$sha\" > \"$correction_result_path\"\nprintf '{\"correction.result\": \"corrected\", \"correction.candidate_sha\": \"%s\"}' \"$sha\"",
+    tool_command="#!/bin/sh\nset -e\ngit add -A\ngit commit --quiet -m \"Fix: bounded integration coherence correction\"\nsha=$(git rev-parse HEAD)\nprintf '{\"result\": \"corrected\", \"candidate_sha\": \"%s\"}' \"$sha\" > \"$correction_result_path\"\nprintf '{\"correction.result\": \"corrected\", \"correction.candidate_sha\": \"%s\"}' \"$sha\"",
     parse_json="true"
   ];
   Candidate -> Exit;

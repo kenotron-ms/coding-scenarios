@@ -255,7 +255,7 @@ digraph plan_batch {
   //
   // A compiler-valid plan is necessary but NOT sufficient for a real-work
   // batch. This deterministic gate independently confirms the real state the
-  // downstream ship-it run depends on: (1) EVERY lane is a real-work lane
+  // downstream execute-plan run depends on: (1) EVERY lane is a real-work lane
   // (child_dot=subgraphs/goal_lane_impl.dot), and (2) EVERY lane's authored
   // goal-condition file actually exists non-empty on disk. It reads plan.json
   // itself (never an LLM's say-so) and copies the goal files into the
