@@ -1,11 +1,3 @@
-# ============================================================================
-# ADAPTED VARIANT: Route 1 (GitHub Actions drives the backend). Compute runs on the
-# hosted compute backend via a bearer-token submit (submit_compute.py),
-# NOT the in-runner attractor engine. GitHub keeps events/issues/PRs/review.
-# Design + auth + first-run risks: docs/designs/gh-actions-hosted-compute.md.
-# The upstream in-runner-engine rationale below is retained for reference; the
-# steps that set up/detach/run that engine have been replaced by the submit step.
-# ============================================================================
 # Feature Specify -- the "specify" stage for FEATURE requests, the sibling of
 # capsule-specify.yml. See .github/capsule-pipeline/README.md for what the
 # vendored files under that directory are and why they exist.
@@ -139,11 +131,6 @@ jobs:
     # a future run is ever killed by the JOB wall rather than the fuse, that
     # is the number to revisit, and it will say so in the log. Clears
     # GitHub's 360-minute hard cap for hosted runners with 110 to spare.
-    #
-    # On the hosted-compute variant the submit step's own --timeout is what
-    # actually bounds the run (see that step below, 14400s); this job wall
-    # still needs to clear that plus setup/PR-creation time, and 250 keeps a
-    # comfortable margin over both.
     timeout-minutes: 250
     steps:
       - name: Checkout
@@ -157,19 +144,6 @@ jobs:
           # comfortably covers the HEAD~30 the next step picks while
           # staying a bounded fetch; full history buys nothing here.
           fetch-depth: 60
-
-      # The runner-side shipped-gate check (verify_shipped_gate.sh, below) runs
-      # the EXACT feature-capsule gate bytes at the pinned base SHA. A gate that
-      # asserts behaviour via pytest (e.g. "must raise ValueError") self-
-      # provisions it with `uv run --with pytest pytest` when uv is on PATH;
-      # without uv (and without system pytest) it exits 2 == INFRA, which
-      # correctly refuses to publish -- but that would block an otherwise-valid
-      # capsule. Installing uv here lets any gate provision its own deps
-      # hermetically: no global pytest, nothing written into the pristine
-      # scratch worktree the gate runs in. Backend workers already have this,
-      # which is why capsule-specify.yml's hosted variant carries the same step.
-      - name: Set up uv (lets pytest-based capsule gates self-provision)
-        uses: astral-sh/setup-uv@v6
 
       - name: Record base SHA and issue metadata
         id: base
@@ -242,6 +216,96 @@ jobs:
           fi
           echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
           echo "existing=$EXISTING" >> "$GITHUB_OUTPUT"
+
+      - name: "Detach the engine: snapshot pipeline-runner out of the workspace"
+        if: steps.idem.outputs.skip != 'true'
+        # FIRES 9 (run 31760312250) AND 10 (run 31766094504) -- one mechanism.
+        # This job used to drive the engine as `uv run --project
+        # modules/pipeline-runner`, which puts the ENGINE's own venv, and every
+        # path dependency uv installs into it (loop-pipeline, remote-source,
+        # unified-llm-client), INSIDE the very workspace this pipeline's maker
+        # agents are instructed to rewrite. The engine was standing on its own
+        # subject.
+        #   - Fire 9: a maker cp'd patched unified_llm files into the in-tree
+        #     venv's site-packages; the engine's next glob-model spawn raised
+        #     `No module named 'unified_llm._cost'` and an already-PROVEN round
+        #     was abandoned.
+        #   - Fire 10, quoting its own postmortem: "the engine that spawns the
+        #     critique node uses the pipeline-runner module's venv
+        #     (modules/pipeline-runner/.venv)... stale, incomplete unified_llm
+        #     namespace package... cannot import name 'resolve_latest_for'".
+        #     The gate had CONVERGED. The judge could never run.
+        # The .dot-side guards (maker env-contract, ambient-install reset guard)
+        # shrink the blast radius but cannot close it: a guard that lives inside
+        # the run can be out-argued by the run. This step closes it
+        # STRUCTURALLY -- the engine's source is copied to $RUNNER_TEMP before
+        # anything can touch the workspace, and nothing the pipeline does to the
+        # workspace afterwards can reach it.
+        #
+        # WHY modules/ WHOLESALE: the engine's path dependencies are RELATIVE
+        # siblings -- modules/pipeline-runner's [tool.uv.sources] points at
+        # ../loop-pipeline and ../remote-source, and loop-pipeline's at
+        # ../unified-llm-client. Copying modules/ verbatim preserves that
+        # structure, so `--project $RUNNER_TEMP/engine-src/modules/pipeline-runner`
+        # resolves exactly what `--project modules/pipeline-runner` used to. No
+        # root pyproject.toml is needed: the repo-root one declares no
+        # [tool.uv.workspace], so uv resolves modules/pipeline-runner standalone
+        # (verified locally -- a snapshot of modules/ alone builds and runs).
+        #
+        # WHY bundles/ TOO: runner.py's `_local_bundle_path()` resolves the
+        # engine's default base bundle RELATIVE TO ITS OWN __file__
+        # (`Path(__file__).resolve().parents[3] / "bundles" /
+        # "attractor-pipeline.yaml"`). Moving the engine without that directory
+        # would silently turn a local-sibling hit into a miss and push the
+        # engine onto its git fallback. These workflows all set
+        # ATTRACTOR_PIPELINE_BUNDLE explicitly, so that default is unreachable
+        # here -- but 20K of YAML is a cheap price for a snapshot that behaves
+        # identically to the in-tree layout it replaces, and bundles/ is
+        # engine-side content by the same rule as modules/.
+        #
+        # NOT DETACHED, deliberately: the .dot itself, --cwd, target_dir and
+        # uplift_dir all still point at the WORKSPACE. The subject tree is
+        # supposed to be the live one; only the engine's own code and venv move.
+        #
+        # PLACEMENT: the first step after this job's read-only preamble
+        # (checkout, base-SHA record, discrimination pick, idempotency probe --
+        # every one of them a `git rev-parse` / `git ls-remote` read), and
+        # strictly before every step that can write into the workspace. It
+        # carries the job's own `if:` guard so a skipped run does no work.
+        run: |
+          set -euo pipefail
+          ENGINE_SRC="$RUNNER_TEMP/engine-src"
+          rm -rf "$ENGINE_SRC"
+          mkdir -p "$ENGINE_SRC"
+          # tar, not `cp -a`: the exclusions apply at ARCHIVE time, so a
+          # .venv/.git/__pycache__ that somehow already exists in the tree never
+          # enters the snapshot at all rather than being copied in and then
+          # deleted afterwards.
+          tar -cf - \
+            --exclude='.venv' \
+            --exclude='.git' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            modules bundles \
+          | tar -xf - -C "$ENGINE_SRC"
+          echo "engine snapshot: $GITHUB_WORKSPACE/{modules,bundles} -> $ENGINE_SRC/"
+          echo "engine snapshot provenance: base SHA $(git rev-parse HEAD)"
+          for required in \
+            "modules/pipeline-runner/pyproject.toml" \
+            "modules/loop-pipeline/pyproject.toml" \
+            "modules/unified-llm-client/pyproject.toml" \
+            "modules/remote-source/pyproject.toml" \
+            "bundles/attractor-pipeline.yaml"; do
+            if [ ! -f "$ENGINE_SRC/$required" ]; then
+              echo "::error::Engine snapshot at $ENGINE_SRC is missing $required -- the detached engine would be unusable and the run step would fail later with a confusing uv error. Refusing to start." >&2
+              exit 1
+            fi
+          done
+          if [ -n "$(find "$ENGINE_SRC" -name .venv -print -quit)" ]; then
+            echo "::error::Engine snapshot at $ENGINE_SRC contains a .venv -- the tar exclusion did not hold, so the engine is not actually detached from the workspace. Refusing to start." >&2
+            exit 1
+          fi
+          echo "engine snapshot verified: pipeline-runner project present, no .venv carried in"
 
       - name: Materialize the issue as issue_file
         id: issue
@@ -508,86 +572,96 @@ jobs:
           echo "--- criteria_file contents ---"
           cat "$criteria_file"
 
-      - name: Submit feature-capsule.dot to the backend (feature specify stage)
+      - uses: actions/setup-python@v5
+        if: steps.idem.outputs.skip != 'true'
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        if: steps.idem.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: "Preflight: the critique judge is unserviceable without an OpenAI key"
+        id: preflight
+        if: steps.idem.outputs.skip != 'true'
+        # Mirror of capsule-specify.yml's preflight, itself a mirror of
+        # capsule-implement.yml's (issue #155). feature-capsule.dot has
+        # exactly ONE judgment node, `critique`, and -- like capsule.dot's --
+        # it HARD-DECLARES llm_provider="openai": the judge must not share the
+        # maker's model family. This job unconditionally mounts
+        # attractor-pipeline-dual.yaml to serve it, so check the one
+        # precondition that makes that mount meaningful BEFORE spending any of
+        # the run's multi-hour budget, and fail loudly, naming exactly what's
+        # missing and what capability is lost, if it isn't met.
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::feature-specify: OPENAI_API_KEY secret is missing. feature-capsule.dot's critique node (this pipeline's ONE judgment node) requires llm_provider=\"openai\" -- a second model family is the point: the judge must be independent of the maker's family (see issue #155 for the proven failure) -- and this job unconditionally mounts attractor-pipeline-dual.yaml to serve it. Without OPENAI_API_KEY that mount cannot serve a real OpenAI model, and running anyway would either crash the node every round (draining the whole iteration budget on a crash loop) or silently degrade the judge to the maker's own family depending on engine version -- both are exactly the failure this preflight exists to prevent. Refusing to start. Provision OPENAI_API_KEY as a repo secret, then re-run." >&2
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is present -- the second-family critique judge (OpenAI) can be honored. Proceeding."
+
+      - name: Run feature-capsule.dot (feature specify stage)
         id: run
         if: steps.idem.outputs.skip != 'true'
-        # Compute runs on the backend, not in this runner. Self-contained bearer-token
-        # client (submit_compute.py) -- no `az`, no local engine, and no
-        # attractor-pipeline-dual.yaml mount for the critique judge's second model
-        # family. Provider mounting (Anthropic maker / OpenAI critique judge) is the
-        # hosted resolver's concern, so no ANTHROPIC/OPENAI keys here either -- unlike
-        # the upstream in-runner variant, which unconditionally mounts that dual bundle
-        # and preflights OPENAI_API_KEY before spending any budget (both removed: the
-        # backend now owns that precondition).
+        # continue-on-error: this workflow classifies the result in a later
+        # step regardless of exit code -- an "abandon" (real non-convergence)
+        # is honest, useful information, not something to hide behind a green
+        # step. The job itself is failed explicitly, later, only when
+        # warranted (see "Fail the job on genuine non-convergence" below).
         continue-on-error: true
         env:
-          COMPUTE_URL: ${{ secrets.COMPUTE_URL }}
-          COMPUTE_TOKEN: ${{ secrets.COMPUTE_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # DUAL-FAMILY JUDGE, UNCONDITIONALLY WIRED -- the same bundle
+          # capsule-specify.yml mounts for capsule.dot's critique node, for
+          # the same reason: feature-capsule.dot's critique node likewise
+          # declares llm_provider="openai", and its header calls this out
+          # explicitly ("ATTRACTOR_PIPELINE_BUNDLE is REQUIRED -- the critique
+          # node pins a second model family, delivered by
+          # attractor-pipeline-dual.yaml exactly as capsule.dot's critique").
+          # There is no single-provider fallback path; the preflight step
+          # above fails the job LOUDLY before this step ever runs if
+          # OPENAI_API_KEY is unset.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ATTRACTOR_PIPELINE_BUNDLE: ${{ format('{0}/.github/capsule-pipeline/attractor-pipeline-dual.yaml', github.workspace) }}
         run: |
           set -uo pipefail
-          OUT="$RUNNER_TEMP/capsule-run/out"
-          mkdir -p "$OUT" "$RUNNER_TEMP/capsule-run/logs" "$RUNNER_TEMP/capsule-submit"
-
-          # Build the dot-graph "custom" input params. The shim (dot_content) runs
-          # the repo-resident feature-capsule.dot inside the backend clone at
-          # base_sha. shim-feature-specify.dot differs from shim-specify.dot (the
-          # defect lane's shim) by materializing a SECOND file -- criteria_file
-          # from criteria_b64 -- before running the graph: feature-capsule.dot's
-          # criteria_gate requires a real, readable criteria_file path (its check
-          # is `[ -s "$CF" ]`; an /api/uploads handle fails that, the same reason
-          # the issue is passed as base64 rather than a remote handle).
-          SHIM=".github/capsule-pipeline/shim-feature-specify.dot"
-          # The dynamic GitHub issue and the authenticated maintainer criteria are
-          # both passed as base64 (issue_b64, criteria_b64); the shim decodes each
-          # to a real path OUTSIDE the workspace tree before feature-capsule.dot's
-          # preflight/criteria_gate checks run against them.
-          jq -n \
-            --rawfile dot "$SHIM" \
-            --arg repo "${{ github.repository }}" \
-            --arg base "${{ steps.base.outputs.sha }}" \
-            --arg issue_b64 "$(base64 -w0 "${{ steps.issue.outputs.file }}")" \
-            --arg criteria_b64 "$(base64 -w0 "${{ steps.criteria.outputs.file }}")" \
-            --arg later "${{ steps.discrim.outputs.later_commit }}" \
-            '{
-              dot_content: $dot,
-              workspace_repo: $repo,
-              base_sha: $base,
-              target_dir: "/project/workspace",
-              issue_file: "/project/.resolve/data/issue.md",
-              issue_b64: $issue_b64,
-              criteria_file: "/project/.resolve/data/criteria.md",
-              criteria_b64: $criteria_b64,
-              uplift_dir: "/project/workspace/.github/capsule-pipeline/vendor",
-              capsule_out: "/project/.resolve/data/capsule",
-              max_iterations: "8",
-              gate_time_ceiling: "180",
-              later_commit: $later
-            }' > "$RUNNER_TEMP/capsule-submit/params.json"
-
-          # Submit -> poll -> auto-answer gates -> fetch capsule_out + events.
-          # Timeout kept under this job's 250-minute wall (see the FUSE
-          # ARITHMETIC comment on this job): 14400s = 240 minutes, leaving 10
-          # minutes for checkout/uv-setup/classify/PR/comment/scrub/upload --
-          # comfortably above the seconds-scale non-engine overhead measured
-          # in this lane's own history.
-          python3 .github/capsule-pipeline/submit_compute.py \
-            --params-file "$RUNNER_TEMP/capsule-submit/params.json" \
-            --out "$OUT" \
-            --meta-dir "$RUNNER_TEMP/capsule-submit/meta" \
-            --data-subpath capsule \
-            --timeout 14400
-          rc=$?
-
-          # Land results where the unchanged downstream steps read them:
-          #   $OUT  = capsule_out  (Classify reads $OUT/*.verify.sh, questions-blocking.md, etc.)
-          #   $GITHUB_WORKSPACE/.ai/{findings,postmortem}  (Classify + comment read these)
-          if [ -d "$OUT/ai" ]; then
-            mkdir -p "$GITHUB_WORKSPACE/.ai/findings" "$GITHUB_WORKSPACE/.ai/postmortem"
-            cp -r "$OUT/ai/findings/." "$GITHUB_WORKSPACE/.ai/findings/" 2>/dev/null || true
-            cp -r "$OUT/ai/postmortem/." "$GITHUB_WORKSPACE/.ai/postmortem/" 2>/dev/null || true
-            rm -rf "$OUT/ai"
-          fi
-          echo "attractor_exit=$rc" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/capsule-run/out" "$RUNNER_TEMP/capsule-run/logs"
+          # Params per the vendored .dot's own INVOCATION header block.
+          # uplift_dir keeps its source param NAME -- capsule.dot's established
+          # handling: the graph resolves every checker through that parameter
+          # and never a hardcoded path, so pointing it at the vendored checker
+          # tree under .github/capsule-pipeline/vendor/ makes every
+          # $uplift_dir/... shell-out resolve exactly as it does for the
+          # defect lane, with zero edits to the graph body.
+          # --on-human-gate auto-approve is REQUIRED for unattended runs: the
+          # CLI default 'fail' crashes at the `escalate` hexagon. auto-approve
+          # answers it with its FIRST option, [A] Abandon -- the declared
+          # fail-safe (option order is load-bearing). The blocked-on-criteria
+          # door never reaches escalate at all.
+          # DETACHED ENGINE (fires 9 + 10): --project points at the
+          # $RUNNER_TEMP snapshot taken before any maker touched the tree, so
+          # the engine's venv and its editable path deps live where workspace
+          # churn cannot reach them. --cwd, target_dir and the .dot path below
+          # deliberately still point at the WORKSPACE: the subject tree is
+          # supposed to be the live one.
+          uv run --project "$RUNNER_TEMP/engine-src/modules/pipeline-runner" attractor run \
+            .github/capsule-pipeline/feature-capsule.dot \
+            --cwd "$GITHUB_WORKSPACE" \
+            --logs-root "$RUNNER_TEMP/capsule-run/logs" \
+            --on-human-gate auto-approve \
+            --param issue_file="${{ steps.issue.outputs.file }}" \
+            --param criteria_file="${{ steps.criteria.outputs.file }}" \
+            --param target_dir="$GITHUB_WORKSPACE" \
+            --param base_sha="${{ steps.base.outputs.sha }}" \
+            --param later_commit="${{ steps.discrim.outputs.later_commit }}" \
+            --param uplift_dir="$GITHUB_WORKSPACE/.github/capsule-pipeline/vendor" \
+            --param capsule_out="$RUNNER_TEMP/capsule-run/out" \
+            --param max_iterations=8 \
+            --param gate_time_ceiling=180
+          echo "attractor_exit=$?" >> "$GITHUB_OUTPUT"
 
       - name: "Fence the capsule pair: record sha256 of every capsule_out file"
         # INCIDENT, 2026-08-13 (PR #205 -- this lane's own output): the

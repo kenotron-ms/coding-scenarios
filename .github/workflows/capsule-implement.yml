@@ -1,11 +1,3 @@
-# ============================================================================
-# ADAPTED VARIANT: Route 1 (GitHub Actions drives the backend). Compute runs on the
-# hosted compute backend via a bearer-token submit (submit_compute.py),
-# NOT the in-runner attractor engine. task-runner.dot runs in the backend clone;
-# its fix is exported as a diff, re-applied here, and pushed by the existing PR
-# step. Design + auth + first-run risks: docs/designs/gh-actions-hosted-compute.md.
-# The upstream in-runner-engine rationale below is retained for reference.
-# ============================================================================
 # Capsule Implement -- the "implement" stage of an issue -> attractor -> PR
 # system. See .github/capsule-pipeline/README.md for what this is and why
 # the vendored files under that directory exist.
@@ -229,6 +221,105 @@ jobs:
             echo "skip=$SKIP"
           } >> "$GITHUB_OUTPUT"
 
+      - name: "Detach the engine: snapshot pipeline-runner out of the workspace"
+        if: steps.locate.outputs.skip != 'true'
+        # FIRES 9 (run 31760312250) AND 10 (run 31766094504) -- one mechanism.
+        # This job used to drive the engine as `uv run --project
+        # modules/pipeline-runner`, which puts the ENGINE's own venv, and every
+        # path dependency uv installs into it (loop-pipeline, remote-source,
+        # unified-llm-client), INSIDE the very workspace this pipeline's maker
+        # agents are instructed to rewrite. The engine was standing on its own
+        # subject.
+        #   - Fire 9: a maker cp'd patched unified_llm files into the in-tree
+        #     venv's site-packages; the engine's next glob-model spawn raised
+        #     `No module named 'unified_llm._cost'` and an already-PROVEN round
+        #     was abandoned.
+        #   - Fire 10, quoting its own postmortem: "the engine that spawns the
+        #     critique node uses the pipeline-runner module's venv
+        #     (modules/pipeline-runner/.venv)... stale, incomplete unified_llm
+        #     namespace package... cannot import name 'resolve_latest_for'".
+        #     The gate had CONVERGED. The judge could never run.
+        # The .dot-side guards (maker env-contract, ambient-install reset guard)
+        # shrink the blast radius but cannot close it: a guard that lives inside
+        # the run can be out-argued by the run. This step closes it
+        # STRUCTURALLY -- the engine's source is copied to $RUNNER_TEMP before
+        # anything can touch the workspace, and nothing the pipeline does to the
+        # workspace afterwards can reach it.
+        #
+        # WHY modules/ WHOLESALE: the engine's path dependencies are RELATIVE
+        # siblings -- modules/pipeline-runner's [tool.uv.sources] points at
+        # ../loop-pipeline and ../remote-source, and loop-pipeline's at
+        # ../unified-llm-client. Copying modules/ verbatim preserves that
+        # structure, so `--project $RUNNER_TEMP/engine-src/modules/pipeline-runner`
+        # resolves exactly what `--project modules/pipeline-runner` used to. No
+        # root pyproject.toml is needed: the repo-root one declares no
+        # [tool.uv.workspace], so uv resolves modules/pipeline-runner standalone
+        # (verified locally -- a snapshot of modules/ alone builds and runs).
+        #
+        # WHY bundles/ TOO: runner.py's `_local_bundle_path()` resolves the
+        # engine's default base bundle RELATIVE TO ITS OWN __file__
+        # (`Path(__file__).resolve().parents[3] / "bundles" /
+        # "attractor-pipeline.yaml"`). Moving the engine without that directory
+        # would silently turn a local-sibling hit into a miss and push the
+        # engine onto its git fallback. These workflows all set
+        # ATTRACTOR_PIPELINE_BUNDLE explicitly, so that default is unreachable
+        # here -- but 20K of YAML is a cheap price for a snapshot that behaves
+        # identically to the in-tree layout it replaces, and bundles/ is
+        # engine-side content by the same rule as modules/.
+        #
+        # NOT DETACHED, deliberately: the .dot itself, --cwd, target_dir and
+        # uplift_dir all still point at the WORKSPACE. The subject tree is
+        # supposed to be the live one; only the engine's own code and venv move.
+        #
+        # PLACEMENT: immediately after "Locate and validate the capsule", which
+        # is read-only (gh api + git ls-remote + file-existence checks) and is
+        # the step that decides whether this run happens at all. Strictly before
+        # every step that can write into the workspace, and it carries the same
+        # `if:` guard as the rest of the job.
+        run: |
+          set -euo pipefail
+          ENGINE_SRC="$RUNNER_TEMP/engine-src"
+          rm -rf "$ENGINE_SRC"
+          mkdir -p "$ENGINE_SRC"
+          # tar, not `cp -a`: the exclusions apply at ARCHIVE time, so a
+          # .venv/.git/__pycache__ that somehow already exists in the tree never
+          # enters the snapshot at all rather than being copied in and then
+          # deleted afterwards.
+          tar -cf - \
+            --exclude='.venv' \
+            --exclude='.git' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            modules bundles \
+          | tar -xf - -C "$ENGINE_SRC"
+          echo "engine snapshot: $GITHUB_WORKSPACE/{modules,bundles} -> $ENGINE_SRC/"
+          echo "engine snapshot provenance: base SHA $(git rev-parse HEAD)"
+          for required in \
+            "modules/pipeline-runner/pyproject.toml" \
+            "modules/loop-pipeline/pyproject.toml" \
+            "modules/unified-llm-client/pyproject.toml" \
+            "modules/remote-source/pyproject.toml" \
+            "bundles/attractor-pipeline.yaml"; do
+            if [ ! -f "$ENGINE_SRC/$required" ]; then
+              echo "::error::Engine snapshot at $ENGINE_SRC is missing $required -- the detached engine would be unusable and the run step would fail later with a confusing uv error. Refusing to start." >&2
+              exit 1
+            fi
+          done
+          if [ -n "$(find "$ENGINE_SRC" -name .venv -print -quit)" ]; then
+            echo "::error::Engine snapshot at $ENGINE_SRC contains a .venv -- the tar exclusion did not hold, so the engine is not actually detached from the workspace. Refusing to start." >&2
+            exit 1
+          fi
+          echo "engine snapshot verified: pipeline-runner project present, no .venv carried in"
+
+      - uses: actions/setup-python@v5
+        if: steps.locate.outputs.skip != 'true'
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        if: steps.locate.outputs.skip != 'true'
+        uses: astral-sh/setup-uv@v4
+
       - name: Configure commit identity for the run
         if: steps.locate.outputs.skip != 'true'
         # task-runner.dot's `package` node commits the fix itself (an LLM
@@ -236,68 +327,204 @@ jobs:
         # standard Amplifier co-authored-by trailer, but does not pin an
         # author identity. Setting it globally here means that commit
         # inherits it, same as any other commit made in this job.
-        #
-        # Pin the pipeline's own bot identity (matches the microsoft-amplifier
-        # co-author trailer the specify stage's engine already emits) so the
-        # applied fix commit is attributed to the pipeline, not a human.
         run: |
-          git config --global user.name "Amplifier"
-          git config --global user.email "240397093+microsoft-amplifier@users.noreply.github.com"
+          git config --global user.name "Brian Krabach"
+          git config --global user.email "brkrabac@microsoft.com"
 
-      - name: Submit task-runner.dot to the backend (implement stage)
+      - name: "Preflight: dual-family critique is unserviceable without an OpenAI key"
+        id: preflight
+        if: steps.locate.outputs.skip != 'true'
+        # Issue #155: an unserviceable provider on a node used to drain the
+        # ENTIRE iteration budget in a crash loop (`resolve_latest_for: no
+        # adapter found for provider 'openai'`) before failing -- burning
+        # 20+ minutes to say what could be said in one line at startup. The
+        # vendored task-runner.dot's critique_b node HARD-DECLARES
+        # llm_provider="openai" (restored to the pristine upstream shape;
+        # see that file's own header) and this job now unconditionally
+        # mounts attractor-pipeline-dual.yaml to serve it -- there is no
+        # more silent single-provider fallback at either layer. So: check
+        # the one precondition that makes that mount meaningful BEFORE
+        # spending any of the run's 30-90+ minute budget, and fail loudly,
+        # naming exactly what's missing and what capability is lost, if it
+        # isn't met.
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::capsule-implement: OPENAI_API_KEY secret is missing. task-runner.dot's critique_b node requires llm_provider=\"openai\" (dual-family critique -- an independent, different-model-family reviewer is the point; see issue #155) and this job unconditionally mounts attractor-pipeline-dual.yaml to serve it. Without OPENAI_API_KEY that mount cannot serve a real OpenAI model, and running anyway would either crash the node every round (draining the whole iteration budget on a crash loop) or silently degrade to single-family review depending on engine version -- both are exactly the failure this preflight exists to prevent. Refusing to start. Provision OPENAI_API_KEY as a repo secret, then re-run." >&2
+            exit 1
+          fi
+          echo "OPENAI_API_KEY is present -- dual-family critique (Anthropic + OpenAI) can be honored. Proceeding."
+
+      - name: "Stage the capsule's vendored gate fixtures beside the gate"
+        id: fixtures
+        if: steps.locate.outputs.skip != 'true'
+        # SHIP WHAT YOU VERIFIED, implement-side half (incident, 2026-08-14,
+        # run 31775541024 -> PR #218). Restoring the dropped fixture on that
+        # branch is necessary but NOT sufficient: as traced below, nothing in
+        # this job or in the vendored task-runner.dot ever puts a capsule's
+        # vendored fixture where its gate looks for it, so a fixture-bearing
+        # capsule would still exit 2 (FATAL) here after a clean merge.
+        #
+        # THE TRACED PATH, end to end:
+        #
+        #   1. This workflow's "Locate and validate the capsule" step resolves
+        #      the pair and exports the .md path:
+        #        CAPSULE_ID="$(basename "$CAPSULE_MD" .md)"
+        #        VERIFY_SH="$(dirname "$CAPSULE_MD")/$CAPSULE_ID.verify.sh"
+        #        echo "capsule_md=$CAPSULE_MD"
+        #
+        #   2. The "Run task-runner.dot" step below passes that path straight
+        #      through as an engine parameter -- it copies nothing:
+        #        --param task_file="$GITHUB_WORKSPACE/${{ steps.locate.outputs.capsule_md }}"
+        #
+        #   3. task-runner.dot's `setup` node does NOT stage a
+        #      .ai/capsule/DEFINITION.{md,verify.sh} pair. It wipes .ai/ and
+        #      only RESOLVES the sibling gate path:
+        #        rm -rf .ai && mkdir -p .ai/feedback .ai/postmortem
+        #        ... VF="$task_file"; VF="${VF%.md}.verify.sh"; ...
+        #        [ -f "$task_file" ] && [ -f "$VF" ] && printf ok || printf missing
+        #
+        #   4. task-runner.dot's `verify` node then runs the gate IN PLACE, at
+        #      its proposals/ path -- there is no .ai/capsule/ copy anywhere:
+        #        VF="$task_file"; VF="${VF%.md}.verify.sh"; ...
+        #        timeout 1800 bash "$VF" > .ai/verify.log 2>&1
+        #
+        #   5. So a gate that resolves its own directory, as #218's does --
+        #        GATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        #        ORACLE_PY="$GATE_DIR/oracle.py"
+        #      resolves GATE_DIR to the PROPOSALS dir, and looks for
+        #      `oracle.py` there. The fixture ships prefix-qualified, as
+        #      `<id>.oracle.py`, because that is how the specify stage's
+        #      `package` step names plain files copied out of .ai/capsule/.
+        #      Nothing strips the prefix back off. Result: FATAL, exit 2,
+        #      every iteration, until the budget is gone.
+        #
+        # THE FIX, and why it is HERE and not in the .dot: steps 3 and 4 are
+        # the vendored task-runner.dot, which this repo deliberately keeps
+        # pristine (see that file's own header). Staging is a workflow-layer
+        # concern anyway -- put the files where the engine's contract already
+        # expects to find them, before the engine starts. The alternative,
+        # noted and NOT taken: teach task-runner.dot's `setup` node to
+        # prefix-strip fixtures itself, which would make the .dot capsule-
+        # aware and diverge it from upstream for a problem the caller can
+        # solve without it.
+        #
+        # Prefix-strip idiom and glob (`<id>.*.py` / `<id>.*.json`) are
+        # verify_shipped_gate.sh's, verbatim -- so the fence that PROVES a
+        # capsule and the stage that RUNS it agree on what a fixture is.
+        #
+        # The staged copies are untracked build inputs, not capsule content:
+        # they are added to the repo's exclude file so neither
+        # task-runner.dot's own `ship_check` gate nor this job's pre-push
+        # porcelain check (both `git status --porcelain | grep -v -E '^\?\? \.ai'`)
+        # sees them, and so no maker's `git add -A` can sweep a duplicate into
+        # the fix PR.
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          CAPSULE_MD="${{ steps.locate.outputs.capsule_md }}"
+          ID="${{ steps.locate.outputs.capsule_id }}"
+          DIR="$(dirname "$CAPSULE_MD")"
+
+          EXCLUDE="$(git rev-parse --git-common-dir)/info/exclude"
+          mkdir -p "$(dirname "$EXCLUDE")"
+          touch "$EXCLUDE"
+
+          staged=0
+          for fixture in "$DIR/$ID."*.py "$DIR/$ID."*.json; do
+            [ -f "$fixture" ] || continue
+            base="$(basename "$fixture")"
+            staged_name="${base#"$ID."}"
+            dest="$DIR/$staged_name"
+
+            # Never clobber repository content. A capsule fixture whose
+            # stripped name collides with a TRACKED file is a capsule that
+            # cannot be staged safely -- say so and stop, rather than
+            # overwriting a real file and running the gate against a tree
+            # that no longer matches the base SHA it pins.
+            if git ls-files --error-unmatch "$dest" >/dev/null 2>&1; then
+              echo "::error::capsule-implement: staging the vendored fixture $base would overwrite the TRACKED file $dest. Refusing -- the gate would then run against a mutated tree. Rename the fixture in the capsule (it is copied out of .ai/capsule/ as <id>.<original-name>) so its stripped name does not collide." >&2
+              exit 1
+            fi
+
+            cp "$fixture" "$dest"
+            grep -qxF "/$dest" "$EXCLUDE" || echo "/$dest" >> "$EXCLUDE"
+            echo "staged vendored fixture $base -> $dest (sha256 $(sha256sum < "$dest" | awk '{print $1}'))"
+            staged=$((staged + 1))
+          done
+
+          if [ "$staged" -eq 0 ]; then
+            echo "no vendored gate fixtures (<id>.*.py / <id>.*.json) ship with this capsule -- the gate runs with the pair alone."
+          else
+            echo "staged $staged vendored gate fixture(s) beside $DIR/$ID.verify.sh"
+          fi
+          # Prove the staging is invisible to the tree checks that follow.
+          echo "--- git status --porcelain (fixtures must not appear) ---"
+          git status --porcelain || true
+
+      - name: Run task-runner.dot (implement stage)
         id: run
         if: steps.locate.outputs.skip != 'true'
-        # Compute runs on the backend, not in this runner. task-runner.dot commits its
-        # fix to a local task/<id> branch INSIDE the backend clone (it does not push);
-        # the shim's Export node writes that change as fix.diff to capsule_out, which
-        # a later step re-applies into this checkout so the existing push/PR step runs
-        # unchanged. Provider mounting is the hosted resolver's concern (no keys here).
+        # continue-on-error: this workflow classifies and reports the
+        # result in later steps regardless of exit code -- a genuine
+        # non-convergence is honest, useful information, not something to
+        # hide behind a green step. The job itself is failed explicitly,
+        # later, only when warranted.
         continue-on-error: true
         env:
-          COMPUTE_URL: ${{ secrets.COMPUTE_URL }}
-          COMPUTE_TOKEN: ${{ secrets.COMPUTE_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # DUAL-FAMILY CRITIQUE, UNCONDITIONALLY WIRED (issue #155): the
+          # vendored task-runner.dot's critique_b node declares
+          # llm_provider="openai" -- a design requirement, not optional --
+          # so this bundle is ALWAYS mounted; there is no single-provider
+          # fallback path any more. If OPENAI_API_KEY is unset, the
+          # "Preflight: dual-family critique is unserviceable without an
+          # OpenAI key" step below fails the job LOUDLY before this step
+          # (and the 30-90+ minute run it would otherwise start) ever runs.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ATTRACTOR_PIPELINE_BUNDLE: ${{ format('{0}/.github/capsule-pipeline/attractor-pipeline-dual.yaml', github.workspace) }}
         run: |
           set -uo pipefail
-          OUT="$RUNNER_TEMP/capsule-implement/out"
-          mkdir -p "$OUT" "$RUNNER_TEMP/capsule-implement/logs" "$RUNNER_TEMP/capsule-implement-submit"
-          BASE_SHA="$(git rev-parse HEAD)"
-
-          SHIM=".github/capsule-pipeline/shim-implement.dot"
-          jq -n \
-            --rawfile dot "$SHIM" \
-            --arg repo "${{ github.repository }}" \
-            --arg base "$BASE_SHA" \
-            --arg task "${{ steps.locate.outputs.capsule_md }}" \
-            '{
-              dot_content: $dot,
-              workspace_repo: $repo,
-              base_sha: $base,
-              target_dir: "/project/workspace",
-              task_file: ("/project/workspace/" + $task),
-              capsule_out: "/project/.resolve/data/capsule",
-              max_iterations: "6"
-            }' > "$RUNNER_TEMP/capsule-implement-submit/params.json"
-
-          python3 .github/capsule-pipeline/submit_compute.py \
-            --params-file "$RUNNER_TEMP/capsule-implement-submit/params.json" \
-            --out "$OUT" \
-            --meta-dir "$RUNNER_TEMP/capsule-implement-submit/meta" \
-            --data-subpath capsule \
-            --gate-answer A \
-            --timeout 21600
-          rc=$?
-
-          # Classify (next step) reads logs/checkpoint.json context.outcome. task-runner.dot
-          # uses outcome=success/fail; synthesize it from the retrieved SHIPPED.md so the
-          # existing exit-code-vs-recorded-outcome cross-check works unchanged.
-          if [ -s "$OUT/SHIPPED.md" ]; then OUTCOME=success; else OUTCOME=fail; fi
-          python3 - "$RUNNER_TEMP/capsule-implement/logs/checkpoint.json" "$OUTCOME" <<'PY'
-          import json, os, sys
-          p, outcome = sys.argv[1], sys.argv[2]
-          os.makedirs(os.path.dirname(p), exist_ok=True)
-          json.dump({"context": {"outcome": outcome}}, open(p, "w"))
-          PY
-          echo "attractor_exit=$rc" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/capsule-implement/logs"
+          # --on-human-gate auto-approve is REQUIRED for unattended runs: the
+          # CLI default 'fail' crashes at the `escalate` hexagon. auto-approve
+          # answers it with its FIRST option, [A] Abandon -- the declared
+          # fail-safe (option order is load-bearing); [C] Continue would raise
+          # the budget and spend more real money with nobody watching. Same
+          # flag, same position, same reason as feature-specify.yml's "Run
+          # feature-capsule.dot" step -- this lane simply never got it.
+          #
+          # Run 31789137305 is what that omission costs. task-runner.dot
+          # reached `escalate` after a genuine stall (gate GREEN, all 6 ACs
+          # met, critic A ship / critic B iterate x3) and the node RAISED
+          # instead of being answered:
+          #   Node escalate attempt 1/3 raised: HumanGateHandler requires an
+          #   Interviewer but none was provided.
+          #   [PIPELINE] X Error at escalate (no_matching_edge): ...
+          #   attractor: status=fail
+          # A crash AT the decision point is not the same event as a declared
+          # abandonment: the postmortem's own options (continue with more
+          # budget / change approach / split the task / abandon) were never
+          # answered by anything, and every classifier downstream in this job
+          # was left inferring what happened from an exit code alone.
+          #
+          # DETACHED ENGINE (fires 9 + 10): --project points at the
+          # $RUNNER_TEMP snapshot taken before any maker touched the tree, so
+          # the engine's venv and its editable path deps live where workspace
+          # churn cannot reach them. --cwd, target_dir and the .dot path below
+          # deliberately still point at the WORKSPACE: the subject tree is
+          # supposed to be the live one.
+          uv run --project "$RUNNER_TEMP/engine-src/modules/pipeline-runner" attractor run \
+            .github/capsule-pipeline/task-runner.dot \
+            --cwd "$GITHUB_WORKSPACE" \
+            --logs-root "$RUNNER_TEMP/capsule-implement/logs" \
+            --on-human-gate auto-approve \
+            --param task_file="$GITHUB_WORKSPACE/${{ steps.locate.outputs.capsule_md }}" \
+            --param target_dir="$GITHUB_WORKSPACE" \
+            --param max_iterations=6
+          echo "attractor_exit=$?" >> "$GITHUB_OUTPUT"
 
       - name: "Classify the run: exit code AND the pipeline's own recorded outcome"
         id: classify
@@ -392,27 +619,6 @@ jobs:
           python3 .github/capsule-pipeline/scrub_secrets.py scrub \
             "$RUNNER_TEMP/capsule-implement" \
             "$GITHUB_WORKSPACE/.ai"
-
-      - name: Apply the backend-produced fix into the workspace
-        id: apply
-        if: steps.locate.outputs.skip != 'true' && steps.run.outputs.attractor_exit == '0' && steps.classify.outputs.converged == 'true'
-        run: |
-          set -euo pipefail
-          OUT="$RUNNER_TEMP/capsule-implement/out"
-          DIFF="$OUT/fix.diff"
-          cd "$GITHUB_WORKSPACE"
-          if [ ! -s "$DIFF" ]; then
-            echo "::error::converged run but no fix.diff at $DIFF -- nothing to apply."
-            exit 1
-          fi
-          # Re-apply the diff task-runner.dot produced on its in-clone task/<id> branch.
-          # The existing "Push fix branch and open PR" step then runs unchanged against
-          # this now-populated tree. Commit identity comes from the kept
-          # "Configure commit identity for the run" step.
-          git apply --index --whitespace=nowarn "$DIFF"
-          git commit \
-            -m "implement: ${{ steps.locate.outputs.capsule_id }} (via the backend)" \
-            -m "Applied from task-runner.dot on the backend (instance $(cat "$RUNNER_TEMP/capsule-implement-submit/meta/instance_id.txt" 2>/dev/null)); fix retrieved from capsule_out."
 
       - name: Push fix branch and open PR
         id: pr
