@@ -1,0 +1,57 @@
+{
+  "plan_id": "issue_13",
+  "description": "L5 URL shortener: implement the stateful HTTP service with SQLite persistence and concurrency-safe click counting, plus all required design artifacts.",
+  "lanes": {
+    "service_impl": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931230440/goals/service_impl.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L5-url-shortener/solution/main.py && test -f scenarios/L5-url-shortener/solution/app.py && test -f scenarios/L5-url-shortener/solution/storage.py && test -f scenarios/L5-url-shortener/solution/codec.py && test -f scenarios/L5-url-shortener/solution/requirements.txt && python -m py_compile scenarios/L5-url-shortener/solution/main.py && python -m py_compile scenarios/L5-url-shortener/solution/app.py && python -m py_compile scenarios/L5-url-shortener/solution/storage.py && python -m py_compile scenarios/L5-url-shortener/solution/codec.py"
+      ],
+      "marker_file": "artifacts/service_impl.done",
+      "marker_content": "service_impl:ok"
+    },
+    "design_docs": {
+      "wave": 2,
+      "depends_on": [
+        "service_impl"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931230440/goals/design_docs.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L5-url-shortener/design/openapi.yaml && test -f scenarios/L5-url-shortener/design/DATA_MODEL.md && test -f scenarios/L5-url-shortener/design/PRD.md && test -f scenarios/L5-url-shortener/design/JTBD.md && test -f scenarios/L5-url-shortener/solution/README.md"
+      ],
+      "marker_file": "artifacts/design_docs.done",
+      "marker_content": "design_docs:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    },
+    {
+      "wave": 2
+    }
+  ],
+  "integration_order": [
+    "service_impl",
+    "design_docs"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
