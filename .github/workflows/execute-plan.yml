@@ -185,6 +185,35 @@ jobs:
           echo "attractor terminal: ${terminal:-unknown} | pr_url: ${pr_url:-none} | rc: $rc"
           exit "$rc"
 
+      # Render the run's state/logs into a readable Markdown summary and surface
+      # it IN the workflow (Step Summary page + collapsible job-log group) so the
+      # per-lane "why" is visible without downloading the run artifact.
+      - name: Attractor run summary
+        id: summary
+        if: always()
+        env:
+          RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          TERMINAL: ${{ steps.run.outputs.terminal }}
+          PR_URL: ${{ steps.run.outputs.pr_url }}
+        run: |
+          set -uo pipefail
+          WORK="$RUNNER_TEMP/goal-plan-$RUN_ID"
+          MD="$WORK/attractor-summary.md"
+          mkdir -p "$WORK"
+          if ! python3 "$GITHUB_WORKSPACE/scripts/attractor_run_summary.py" \
+                 --state "$WORK/state" --logs "$WORK/logs" \
+                 --run-id "$RUN_ID" --terminal "${TERMINAL:-unknown}" --pr-url "${PR_URL:-}" > "$MD"; then
+            {
+              echo "## Attractor batch $RUN_ID - ${TERMINAL:-unknown}"
+              echo ""
+              echo "_(summary generation failed; download the attractor-run-logs artifact)_"
+            } > "$MD"
+          fi
+          cat "$MD" >> "$GITHUB_STEP_SUMMARY"
+          echo "::group::Attractor run summary ($RUN_ID)"
+          cat "$MD"
+          echo "::endgroup::"
+
       - name: Upload run logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -200,15 +229,29 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
             const status = '${{ steps.run.outcome }}';
             const runId = '${{ steps.resolve.outputs.run_id }}';
+            const terminal = '${{ steps.run.outputs.terminal }}';
             const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const emoji = status === 'success' ? '🚀' : '❌';
+            let summary = '_(per-lane summary unavailable; see the run Step Summary or the `attractor-run-logs` artifact.)_';
+            try {
+              const mdPath = `${process.env.RUNNER_TEMP}/goal-plan-${runId}/attractor-summary.md`;
+              summary = fs.readFileSync(mdPath, 'utf8');
+              const MAX = 60000; // keep well under GitHub's ~65k comment limit
+              if (summary.length > MAX) {
+                summary = summary.slice(0, MAX) + '\n\n_…truncated; see the run Step Summary or the `attractor-run-logs` artifact._';
+              }
+            } catch (e) {
+              core.info(`No summary file to embed: ${e}`);
+            }
             const body = [
-              `${emoji} **Batch \`${runId}\` execution: ${status}.**`,
+              `${emoji} **Batch \`${runId}\` execution: ${status}** (terminal: \`${terminal || 'unknown'}\`).`,
               '',
-              `[View the run](${url}) for per-lane terminals (COMPLETE / RESIDUALS_READY /`,
-              `INFRA_FAILURE / ABORTED) and any delivered PRs.`,
+              summary,
+              '',
+              `[View the full run](${url}) · the same per-lane summary is on the run's **Step Summary**; raw per-node logs are in the \`attractor-run-logs\` artifact.`,
             ].join('\n');
             await github.rest.issues.createComment({
               ...context.repo, issue_number: context.issue.number, body });
