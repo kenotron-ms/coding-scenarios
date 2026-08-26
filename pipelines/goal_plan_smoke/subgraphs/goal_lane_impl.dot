@@ -103,7 +103,7 @@ digraph goal_lane_impl {
   ];
 
   Implement -> Verify;
-  Implement -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a box-node crash/gate-fail must not dead-end the lane (RUBRIC.md 3.2)
+  Implement -> Diagnose [condition="outcome=fail", runs_on="failure"]; // /goal-faithful: a work-node stumble feeds the retry loop (Diagnose->RepeatCheck->ReserveAttempt), NOT a dead-end. RepeatCheck (same-signature-twice) + the attempt budget are the decision point (RUBRIC.md 3.2)
 
   // Independent judgment node -- adversarial and separate from Implement, so
   // the exit is gated on re-gathered evidence, not the implementer's own
@@ -119,7 +119,7 @@ digraph goal_lane_impl {
   ];
 
   Verify -> CheckVerdict;
-  Verify -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a Verify crash/human-gate-fail must not dead-end the lane -- exit as a named blocker (RUBRIC.md 3.2)
+  Verify -> Diagnose [condition="outcome=fail", runs_on="failure"]; // /goal-faithful: a Verify crash/gate becomes a diagnosed retry, not an instant block. A genuinely recurring wall (e.g. a real human gate) repeats its signature -> RepeatCheck routes to Postmortem->BlockedExit; a transient crash gets another attempt (RUBRIC.md 3.2)
 
   // Deterministic gate: reads the verdict FILE the independent judge wrote
   // (not the box node's $last_response) and emits PASS / FAIL / INFRA on the
@@ -164,7 +164,7 @@ digraph goal_lane_impl {
   ];
 
   Diagnose -> RepeatCheck;
-  Diagnose -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a box-node crash/gate-fail must not dead-end the lane (RUBRIC.md 3.2)
+  Diagnose -> RepeatCheck [condition="outcome=fail", runs_on="failure"]; // /goal-faithful: even a failed diagnosis keeps looping -- RepeatCheck + the attempt budget bound it, never a dead-end (RUBRIC.md 3.2)
 
   // Deterministic: distinguish a fresh failure (worth another attempt) from
   // the identical failure recurring (a deterministic bug the loop cannot
