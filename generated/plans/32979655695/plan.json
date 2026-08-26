@@ -1,0 +1,114 @@
+{
+  "plan_id": "issue_15",
+  "description": "L7 Kanban Sprints: iterative multi-sprint delivery of the Kanban application across five sequential sprints (S0-S4), each adding features while maintaining 100% cumulative regression coverage from all prior sprints.",
+  "lanes": {
+    "sprint0_mvp": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32979655695/goals/sprint0_mvp.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L7-kanban-sprints/solution && make migrate && make run &SERVER_PID=$!; sleep 5; npx playwright test tests/smoke/sprint_0 --reporter=line; STATUS=$?; kill $SERVER_PID 2>/dev/null; exit $STATUS"
+      ],
+      "marker_file": "artifacts/sprint0_mvp.done",
+      "marker_content": "sprint0_mvp:ok"
+    },
+    "sprint1_drag": {
+      "wave": 2,
+      "depends_on": [
+        "sprint0_mvp"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32979655695/goals/sprint1_drag.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L7-kanban-sprints/solution && make migrate && make run &SERVER_PID=$!; sleep 5; npx playwright test tests/smoke/sprint_1 --reporter=line; STATUS=$?; kill $SERVER_PID 2>/dev/null; exit $STATUS"
+      ],
+      "marker_file": "artifacts/sprint1_drag.done",
+      "marker_content": "sprint1_drag:ok"
+    },
+    "sprint2_auth": {
+      "wave": 3,
+      "depends_on": [
+        "sprint1_drag"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32979655695/goals/sprint2_auth.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L7-kanban-sprints/solution && make migrate && make run &SERVER_PID=$!; sleep 5; npx playwright test tests/smoke/sprint_2 --reporter=line; STATUS=$?; kill $SERVER_PID 2>/dev/null; exit $STATUS"
+      ],
+      "marker_file": "artifacts/sprint2_auth.done",
+      "marker_content": "sprint2_auth:ok"
+    },
+    "sprint3_labels": {
+      "wave": 4,
+      "depends_on": [
+        "sprint2_auth"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32979655695/goals/sprint3_labels.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L7-kanban-sprints/solution && make migrate && make run &SERVER_PID=$!; sleep 5; npx playwright test tests/smoke/sprint_3 --reporter=line; STATUS=$?; kill $SERVER_PID 2>/dev/null; exit $STATUS"
+      ],
+      "marker_file": "artifacts/sprint3_labels.done",
+      "marker_content": "sprint3_labels:ok"
+    },
+    "sprint4_realtime": {
+      "wave": 5,
+      "depends_on": [
+        "sprint3_labels"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32979655695/goals/sprint4_realtime.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "cd scenarios/L7-kanban-sprints/solution && make migrate && make run &SERVER_PID=$!; sleep 5; npx playwright test tests/smoke/sprint_4 --reporter=line; STATUS=$?; kill $SERVER_PID 2>/dev/null; exit $STATUS"
+      ],
+      "marker_file": "artifacts/sprint4_realtime.done",
+      "marker_content": "sprint4_realtime:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    },
+    {
+      "wave": 2
+    },
+    {
+      "wave": 3
+    },
+    {
+      "wave": 4
+    },
+    {
+      "wave": 5
+    }
+  ],
+  "integration_order": [
+    "sprint0_mvp",
+    "sprint1_drag",
+    "sprint2_auth",
+    "sprint3_labels",
+    "sprint4_realtime"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
