@@ -252,17 +252,32 @@ def _listed_realpaths(git_argv_prefix: Sequence[str], target_repo: str) -> set[s
 # Item 4/5 shared primitive: complete filesystem manifest (excludes .git)
 # ---------------------------------------------------------------------------
 
+# Ephemeral tool caches a read-only verifier may legitimately create (pytest,
+# hypothesis, bytecode, linters). These are NOT source mutations, so the purity
+# check must ignore them -- otherwise a passing `pytest` verifier that writes
+# __pycache__/.pytest_cache is misread as a tree-mutating verifier and its
+# verdict is discarded as INFRA regardless of exit code. Excluding them keeps
+# tamper detection intact for real (tracked-source) changes.
+_EPHEMERAL_DIR_NAMES = frozenset(
+    {"__pycache__", ".pytest_cache", ".hypothesis", ".ruff_cache", ".mypy_cache"}
+)
+_EPHEMERAL_FILE_SUFFIXES = (".pyc", ".pyo")
+
 
 def snapshot_worktree_manifest(worktree_path: str) -> dict[str, Any]:
     """Complete recursive lstat manifest of the worktree, tracked/untracked/
-    ignored, excluding only `.git`. Returns entries plus a canonical hash."""
+    ignored, excluding `.git` and ephemeral tool caches (`_EPHEMERAL_DIR_NAMES`
+    / `_EPHEMERAL_FILE_SUFFIXES`). Returns entries plus a canonical hash."""
     root = os.path.realpath(worktree_path)
     entries: dict[str, dict[str, Any]] = {}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d != ".git")
+        dirnames[:] = sorted(
+            d for d in dirnames if d != ".git" and d not in _EPHEMERAL_DIR_NAMES
+        )
         rel_dir = os.path.relpath(dirpath, root)
         # In a linked worktree, `.git` is a plain file (a gitdir pointer), not
         # a directory, so it must also be excluded from filenames at the root.
+        filenames = [f for f in filenames if not f.endswith(_EPHEMERAL_FILE_SUFFIXES)]
         names = sorted(filenames) + dirnames
         if rel_dir == ".":
             names = [n for n in names if n != ".git"]
