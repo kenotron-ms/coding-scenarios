@@ -3,8 +3,8 @@
 The machine-readable grader is `rubric.yaml`; this is its readable companion.
 See `framework/GRADING.md` for the contract and `framework/HARNESS.md` for how to
 run it. **This scenario is the proven reference** — its grader passes on
-`reference/solution/` (score 99, Converged-Clean) and fails on
-`reference/solution_broken/` (gate FAIL, score 0).
+`graders/references/L0-roman-numerals/solution/` (score 99, Converged-Clean) and fails on
+`graders/references/L0-roman-numerals/solution_broken/` (gate FAIL, score 0).
 
 ## How to run it
 

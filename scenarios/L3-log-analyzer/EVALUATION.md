@@ -2,8 +2,8 @@
 
 The machine-readable grader is `rubric.yaml`; this is its readable companion.
 See `framework/GRADING.md` for the contract and `framework/HARNESS.md` for how
-to run it. Its grader **passes on `reference/solution/`** (gate PASS, high score)
-and **fails on `reference/solution_broken/`** (acceptance < 0.95, gate FAIL) --
+to run it. Its grader **passes on `graders/references/L3-log-analyzer/solution/`** (gate PASS, high score)
+and **fails on `graders/references/L3-log-analyzer/solution_broken/`** (acceptance < 0.95, gate FAIL) --
 proving the grader discriminates a correct CLI from one that emits wrong
 aggregates.
 
@@ -17,7 +17,7 @@ tier imports the solution (REQUIREMENTS.md §6.3).
 ```
 python framework/harness/run_scenario.py \
     --scenario scenarios/L3-log-analyzer \
-    --solution scenarios/L3-log-analyzer/reference/solution \
+    --solution graders/references/L3-log-analyzer/solution \
     [--telemetry telemetry.json] --strategy <name> \
     --out runs/<datetime>/L3/
 ```
@@ -93,7 +93,7 @@ huge streamed input (memory + no timeout); CRLF endings; invalid-UTF-8 bytes; a
 ## Gate & discrimination
 
 `gate: "acceptance_pass >= 0.95"`. The broken mutant
-(`reference/solution_broken/`) is byte-for-byte the reference except it orders
+(`graders/references/L3-log-analyzer/solution_broken/`) is byte-for-byte the reference except it orders
 `top_paths` **ascending** and counts `status > 400` for the error rate. It still
 runs and prints a plausible report, but fails every ordering/JSON-golden/error-
 rate assertion -- driving `acceptance_pass` well below 0.95 and the gate to

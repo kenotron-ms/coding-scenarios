@@ -112,7 +112,7 @@ user if a project convention differs.
 - **Sanity check every grader before trusting it.** For each scenario, the
   grader must **pass on the reference solution** and **fail on a broken mutant**.
   If it does not discriminate, the grader — not the strategy — is wrong. Fix it
-  before running real strategies. (L0 ships both; see `scenarios/L0-*/reference/`.)
+  before running real strategies. (L0 ships both; see `graders/references/L0-roman-numerals/`.)
 - **Ladder profile.** Aggregate per-scenario `score.json` into the strategy's
   ladder profile (`RUBRIC_FRAMEWORK.md §6`): the highest rung reached at/above
   its pass threshold, and the shape of the fall-off.

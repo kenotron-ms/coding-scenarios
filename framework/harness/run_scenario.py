@@ -15,7 +15,7 @@ carries a provisional value from the static-analysis floor.
 Usage:
   python framework/harness/run_scenario.py \
       --scenario scenarios/L0-roman-numerals \
-      --solution scenarios/L0-roman-numerals/reference/solution \
+      --solution graders/references/L0-roman-numerals/solution \
       [--telemetry telemetry.json] [--strategy name] --out runs/<dt>/L0/
 """
 from __future__ import annotations
