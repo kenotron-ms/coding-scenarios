@@ -1,0 +1,126 @@
+flowchart TD
+  Start(["Start"])
+  Exit(["Exit"])
+  CheckAbortRequested[/"Check Abort Requested"/]
+  CheckPlanCorrespondence[/"Check Plan&lt;-&gt;DOT Correspondence"/]
+  Admit[/"Admit Run"/]
+  PrelaunchBlocked[/"Prelaunch Infrastructure Blocked"/]
+  LaunchLaneA[/"Launch sprint_0_mvp"/]
+  ClassifyWave1[/"Classify Wave 1 Lane Outcomes"/]
+  ParentVerifyA[/"Parent-Verify sprint_0_mvp Candidate"/]
+  IntegrateA[/"Integrate sprint_0_mvp (merge + aggregate)"/]
+  LaunchLaneB[/"Launch sprint_1_ordering (Wave 2, sequential)"/]
+  ParentVerifyB[/"Parent-Verify sprint_1_ordering Candidate"/]
+  IntegrateB[/"Integrate sprint_1_ordering (merge + aggregate)"/]
+  LaunchLaneC[/"Launch sprint_2_auth (Wave 3, sequential)"/]
+  ParentVerifyC[/"Parent-Verify sprint_2_auth Candidate"/]
+  IntegrateC[/"Integrate sprint_2_auth (merge + aggregate)"/]
+  LaunchLaneD[/"Launch sprint_3_labels (Wave 4, sequential)"/]
+  ParentVerifyD[/"Parent-Verify sprint_3_labels Candidate"/]
+  IntegrateD[/"Integrate sprint_3_labels (merge + aggregate)"/]
+  LaunchLaneE[/"Launch sprint_4_activity (Wave 5, sequential)"/]
+  ParentVerifyE[/"Parent-Verify sprint_4_activity Candidate"/]
+  IntegrateE[/"Integrate sprint_4_activity (merge + aggregate)"/]
+  PreCoherenceAggregate[/"Pre-Coherence Aggregate"/]
+  Coherence["Cross-Lane Coherence Review"]
+  CoherenceCheck[/"Coherence Check"/]
+  Correction[/"Launch Integration Correction (bounded, 1 round)"/]
+  AffectedClosureAggregate[/"Affected-Closure + Fresh Coherence Aggregate"/]
+  FinalFreeze[/"Freeze Final HEAD + Lane Sweep"/]
+  FinalAggregateAfterSweep[/"Final Aggregate After Sweep"/]
+  DeliveryGate[/"Delivery Enabled?"/]
+  Deliver["Deliver PR (subgraph)"]
+  PreTerminalCleanup[/"Pre-Terminal Cleanup"/]
+  Complete[/"Complete"/]
+  Residuals[/"Residuals (named, evidence-backed)"/]
+  ResidualsCleanup[/"Pre-Terminal Cleanup (residuals path)"/]
+  CompleteCarrier[/"CompleteCarrier"/]
+  ResidualsCarrier[/"ResidualsCarrier"/]
+  InfraCarrier[/"InfraCarrier"/]
+  AbortedCarrier[/"AbortedCarrier"/]
+  Start --> CheckAbortRequested
+  CheckAbortRequested -->|proceed| CheckPlanCorrespondence
+  CheckAbortRequested -->|abort_requested| AbortedCarrier
+  Start --> CheckPlanCorrespondence
+  CheckPlanCorrespondence -->|correspondence_ok| Admit
+  CheckPlanCorrespondence -->|correspondence_mismatch| PrelaunchBlocked
+  Admit -->|admitted| LaunchLaneA
+  Admit -->|≠ admitted| PrelaunchBlocked
+  PrelaunchBlocked --> InfraCarrier
+  LaunchLaneA -->|launched| ClassifyWave1
+  LaunchLaneA -->|supervisor_infra_failure| InfraCarrier
+  ClassifyWave1 -->|else| ParentVerifyA
+  ParentVerifyA -->|PASS| IntegrateA
+  ParentVerifyA -->|INFRA| InfraCarrier
+  ParentVerifyA -->|FAIL| Residuals
+  ParentVerifyA -->|≠ PASS| Residuals
+  IntegrateA -->|ACCEPTED| LaunchLaneB
+  IntegrateA -->|AGGREGATE_INFRA| InfraCarrier
+  IntegrateA -->|MERGE_CONFLICT| Residuals
+  IntegrateA -->|AGGREGATE_FAIL| Residuals
+  LaunchLaneB -->|launched| ParentVerifyB
+  LaunchLaneB -->|crashed| InfraCarrier
+  ParentVerifyB -->|PASS| IntegrateB
+  ParentVerifyB -->|INFRA| InfraCarrier
+  ParentVerifyB -->|FAIL| Residuals
+  ParentVerifyB -->|≠ PASS| Residuals
+  IntegrateB -->|ACCEPTED| LaunchLaneC
+  IntegrateB -->|AGGREGATE_INFRA| InfraCarrier
+  IntegrateB -->|MERGE_CONFLICT| Residuals
+  IntegrateB -->|AGGREGATE_FAIL| Residuals
+  LaunchLaneC -->|launched| ParentVerifyC
+  LaunchLaneC -->|crashed| InfraCarrier
+  ParentVerifyC -->|PASS| IntegrateC
+  ParentVerifyC -->|INFRA| InfraCarrier
+  ParentVerifyC -->|FAIL| Residuals
+  ParentVerifyC -->|≠ PASS| Residuals
+  IntegrateC -->|ACCEPTED| LaunchLaneD
+  IntegrateC -->|AGGREGATE_INFRA| InfraCarrier
+  IntegrateC -->|MERGE_CONFLICT| Residuals
+  IntegrateC -->|AGGREGATE_FAIL| Residuals
+  LaunchLaneD -->|launched| ParentVerifyD
+  LaunchLaneD -->|crashed| InfraCarrier
+  ParentVerifyD -->|PASS| IntegrateD
+  ParentVerifyD -->|INFRA| InfraCarrier
+  ParentVerifyD -->|FAIL| Residuals
+  ParentVerifyD -->|≠ PASS| Residuals
+  IntegrateD -->|ACCEPTED| LaunchLaneE
+  IntegrateD -->|AGGREGATE_INFRA| InfraCarrier
+  IntegrateD -->|MERGE_CONFLICT| Residuals
+  IntegrateD -->|AGGREGATE_FAIL| Residuals
+  LaunchLaneE -->|launched| ParentVerifyE
+  LaunchLaneE -->|crashed| InfraCarrier
+  ParentVerifyE -->|PASS| IntegrateE
+  ParentVerifyE -->|INFRA| InfraCarrier
+  ParentVerifyE -->|FAIL| Residuals
+  ParentVerifyE -->|≠ PASS| Residuals
+  IntegrateE -->|ACCEPTED| PreCoherenceAggregate
+  IntegrateE -->|AGGREGATE_INFRA| InfraCarrier
+  IntegrateE -->|MERGE_CONFLICT| Residuals
+  IntegrateE -->|AGGREGATE_FAIL| Residuals
+  PreCoherenceAggregate -->|aggregate_ok| Coherence
+  PreCoherenceAggregate -->|aggregate_fail| InfraCarrier
+  Coherence --> CoherenceCheck
+  CoherenceCheck -->|finding| Correction
+  CoherenceCheck -->|no_finding| FinalFreeze
+  Correction -->|corrected| AffectedClosureAggregate
+  Correction -->|blocked| Residuals
+  Correction -->|crashed| InfraCarrier
+  AffectedClosureAggregate -->|aggregate_ok| FinalFreeze
+  AffectedClosureAggregate -->|aggregate_fail| InfraCarrier
+  FinalFreeze -->|sweep_ok| FinalAggregateAfterSweep
+  FinalFreeze -->|sweep_fail| InfraCarrier
+  FinalAggregateAfterSweep -->|aggregate_ok| DeliveryGate
+  FinalAggregateAfterSweep -->|aggregate_fail| InfraCarrier
+  DeliveryGate -->|deliver| Deliver
+  DeliveryGate -->|skip_delivery| PreTerminalCleanup
+  Deliver -->|context.delivery.result=opened| PreTerminalCleanup
+  Deliver -->|context.delivery.result=failed| Residuals
+  PreTerminalCleanup --> Complete
+  Complete --> CompleteCarrier
+  Residuals --> ResidualsCleanup
+  ResidualsCleanup --> ResidualsCarrier
+  CompleteCarrier --> Exit
+  ResidualsCarrier --> Exit
+  InfraCarrier --> Exit
+  AbortedCarrier --> Exit

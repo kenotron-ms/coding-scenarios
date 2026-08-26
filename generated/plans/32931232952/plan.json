@@ -1,0 +1,114 @@
+{
+  "plan_id": "issue_15",
+  "description": "L7 Kanban Sprints: deliver the L6 Kanban application as five sequential agile sprints (S0-S4), each passing its own acceptance criteria plus the full cumulative regression suite from all prior sprints. Lanes are strictly sequential because each sprint depends on the previous sprint boundary passing.",
+  "lanes": {
+    "sprint_0_mvp": {
+      "wave": 1,
+      "depends_on": [],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931232952/goals/sprint_0_mvp.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L7-kanban-sprints/solution/Makefile && grep -r 'sprint_0' scenarios/L7-kanban-sprints/solution/tests/ && test -f scenarios/L7-kanban-sprints/design/sprints/sprint-0.md && test -f scenarios/L7-kanban-sprints/design/retros/retro-0.md"
+      ],
+      "marker_file": "artifacts/sprint_0_mvp.done",
+      "marker_content": "sprint_0_mvp:ok"
+    },
+    "sprint_1_ordering": {
+      "wave": 2,
+      "depends_on": [
+        "sprint_0_mvp"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931232952/goals/sprint_1_ordering.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L7-kanban-sprints/solution/backend/migrations/0002_positions.sql && test -f scenarios/L7-kanban-sprints/design/sprints/sprint-1.md && test -f scenarios/L7-kanban-sprints/design/retros/retro-1.md && test -f scenarios/L7-kanban-sprints/design/interaction/s1-drag-states.md"
+      ],
+      "marker_file": "artifacts/sprint_1_ordering.done",
+      "marker_content": "sprint_1_ordering:ok"
+    },
+    "sprint_2_auth": {
+      "wave": 3,
+      "depends_on": [
+        "sprint_1_ordering"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931232952/goals/sprint_2_auth.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L7-kanban-sprints/solution/backend/migrations/0003_auth_ownership.sql && test -f scenarios/L7-kanban-sprints/design/sprints/sprint-2.md && test -f scenarios/L7-kanban-sprints/design/retros/retro-2.md && test -f scenarios/L7-kanban-sprints/design/research/usability/session-1.md"
+      ],
+      "marker_file": "artifacts/sprint_2_auth.done",
+      "marker_content": "sprint_2_auth:ok"
+    },
+    "sprint_3_labels": {
+      "wave": 4,
+      "depends_on": [
+        "sprint_2_auth"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931232952/goals/sprint_3_labels.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L7-kanban-sprints/solution/backend/migrations/0004_labels_members.sql && test -f scenarios/L7-kanban-sprints/design/sprints/sprint-3.md && test -f scenarios/L7-kanban-sprints/design/retros/retro-3.md && test -f scenarios/L7-kanban-sprints/design/research/usability/session-2.md"
+      ],
+      "marker_file": "artifacts/sprint_3_labels.done",
+      "marker_content": "sprint_3_labels:ok"
+    },
+    "sprint_4_activity": {
+      "wave": 5,
+      "depends_on": [
+        "sprint_3_labels"
+      ],
+      "child_dot": "subgraphs/goal_lane_impl.dot",
+      "goal_condition_file": "/home/runner/work/coding-scenarios/coding-scenarios/generated/plans/32931232952/goals/sprint_4_activity.goal.md",
+      "verifier_argv": [
+        "bash",
+        "-c",
+        "test -f scenarios/L7-kanban-sprints/solution/backend/migrations/0005_activity.sql && test -f scenarios/L7-kanban-sprints/design/sprints/sprint-4.md && test -f scenarios/L7-kanban-sprints/design/retros/retro-4.md && test -f scenarios/L7-kanban-sprints/design/research/usability/session-3.md"
+      ],
+      "marker_file": "artifacts/sprint_4_activity.done",
+      "marker_content": "sprint_4_activity:ok"
+    }
+  },
+  "waves": [
+    {
+      "wave": 1
+    },
+    {
+      "wave": 2
+    },
+    {
+      "wave": 3
+    },
+    {
+      "wave": 4
+    },
+    {
+      "wave": 5
+    }
+  ],
+  "integration_order": [
+    "sprint_0_mvp",
+    "sprint_1_ordering",
+    "sprint_2_auth",
+    "sprint_3_labels",
+    "sprint_4_activity"
+  ],
+  "terminals": [
+    "COMPLETE",
+    "RESIDUALS_READY",
+    "INFRA_FAILURE",
+    "ABORTED"
+  ],
+  "budgets": {
+    "max_adaptive_attempts_per_lane": 3,
+    "lane_wall_timeout_seconds": 3600,
+    "verifier_timeout_seconds": 300
+  }
+}
