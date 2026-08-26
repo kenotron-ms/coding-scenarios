@@ -103,6 +103,7 @@ digraph goal_lane_impl {
   ];
 
   Implement -> Verify;
+  Implement -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a box-node crash/gate-fail must not dead-end the lane (RUBRIC.md 3.2)
 
   // Independent judgment node -- adversarial and separate from Implement, so
   // the exit is gated on re-gathered evidence, not the implementer's own
@@ -118,6 +119,7 @@ digraph goal_lane_impl {
   ];
 
   Verify -> CheckVerdict;
+  Verify -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a Verify crash/human-gate-fail must not dead-end the lane -- exit as a named blocker (RUBRIC.md 3.2)
 
   // Deterministic gate: reads the verdict FILE the independent judge wrote
   // (not the box node's $last_response) and emits PASS / FAIL / INFRA on the
@@ -162,6 +164,7 @@ digraph goal_lane_impl {
   ];
 
   Diagnose -> RepeatCheck;
+  Diagnose -> InfraExit [condition="outcome=fail", runs_on="failure"]; // safety net: a box-node crash/gate-fail must not dead-end the lane (RUBRIC.md 3.2)
 
   // Deterministic: distinguish a fresh failure (worth another attempt) from
   // the identical failure recurring (a deterministic bug the loop cannot
@@ -183,6 +186,7 @@ digraph goal_lane_impl {
     prompt="Lane $lane_id has now hit the SAME failure signature twice in a row (see .goal_lane_failure_signatures.log) -- this is very likely a deterministic bug or an unsatisfiable goal specification in $goal_condition_file, not model drift a retry can correct. Write a short honest postmortem to .goal_lane_postmortem.txt: what was attempted, what the repeated failure signature is, and why a further blind retry is unlikely to make the goal's done-condition true. Print the single line: postmortem_written"
   ];
   Postmortem -> BlockedExit;
+  Postmortem -> BlockedExit [condition="outcome=fail", runs_on="failure"]; // safety net: a box-node crash must still reach the terminal blocked exit (RUBRIC.md 3.2)
 
   BudgetExhausted [
     shape=parallelogram, label="Budget Exhausted",
