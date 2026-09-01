@@ -64,7 +64,7 @@ gate:
 | `cli` | subprocess with argv/stdin | golden-file / exit-code / stdout-stderr assertions |
 | `http-service` | start server, poll health | live HTTP requests, DB/state assertions, concurrency probes |
 | `web-app` | start backend+frontend | API tests + browser E2E (Playwright) against real DOM |
-| `desktop-app` | build/package native app; drive webview via WebDriver | Tauri app via `tauri-driver`/WebDriver against a real endpoint (e.g. containerized `sshd`); perf + security checks on the packaged binary (L8) |
+| `desktop-app` | build/package native app; drive webview via WebDriver | Tauri app via `tauri-driver`/WebDriver against a real endpoint (e.g. containerized `sshd`); perf + security checks on the packaged binary (A3) |
 
 The **kind climbs the ladder** (module → cli → service → web-app → desktop-app), which is a
 large part of what makes higher rungs harder: the *real path* being verified
@@ -78,7 +78,7 @@ Per the verification-driven principle: the acceptance tier must exercise the
 - L0–L2: the real path *is* the function/class → unit/property tests are the real path.
 - L3: run the actual built CLI as a subprocess; assert real stdout/exit codes.
 - L5: hit a real running server over real HTTP against real persistence.
-- L6–L7: drive the real UI in a real browser plus real API calls.
+- A1–A2: drive the real UI in a real browser plus real API calls.
 
 Mock-only evidence is never sufficient at L3+ and is not accepted as acceptance
 verification. This mirrors the harness we are trying to prove out: strategies

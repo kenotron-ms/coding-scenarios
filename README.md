@@ -13,7 +13,11 @@ rubric so two strategies can be compared on the same ladder.
 > resolved design decisions (five forks), and the document map. §5 of the vision
 > lists the assumptions taken while authoring this set — review and correct any.
 
-## The ladder
+## The ladder (L0–L5 — the scored library track)
+
+The **scored ladder is L0–L5**: pure function → edge-case parsing → stateful unit
+→ CLI → **multi-module library** → stateful service. Every rung here is graded,
+Python, and verifiable without a browser or desktop shell.
 
 | Level | Scenario | New difficulty | Gate | Pass |
 |-------|----------|----------------|------|------|
@@ -23,13 +27,23 @@ rubric so two strategies can be compared on the same ladder.
 | [L3](scenarios/L3-log-analyzer/REQUIREMENTS.md) | Log analyzer | CLI: argv, I/O, exit codes, formats | ≥95% | 72 |
 | [L4](scenarios/L4-template-engine/REQUIREMENTS.md) | Template engine | Multi-module library + public API | ≥95% | 70 |
 | [L5](scenarios/L5-url-shortener/REQUIREMENTS.md) | URL shortener | Service: HTTP + persistence + concurrency | ≥95% | 68 |
-| [L6](scenarios/L6-kanban-app/REQUIREMENTS.md) | Kanban app | Full app: data + rules + UI + E2E | 100% P0, ≥90% | 68 |
-| [L7](scenarios/L7-kanban-sprints/REQUIREMENTS.md) | Kanban sprints | Iterative multi-sprint + regression | per-sprint | 68 |
-| [L8](scenarios/L8-markdown-editor/REQUIREMENTS.md) | Markdown vault editor | Native desktop (Tauri) + SSH + security + WYSIWYM | P0 + perf + security, ≥90% | 66 |
 
-L6 and L7 **share the same application**: L6 builds it once, L7 re-delivers it as
-five scripted sprints. This keeps the top of the ladder comparable across
-strategies.
+## Application tier (A1–A3 — parked, out of the scored ladder)
+
+These three were the original L6–L8. They **jumped the shark** for a language/
+library benchmark: full web/native apps whose grading needs a real browser or a
+Tauri + SSH desktop harness (reality-check territory, not objective library
+scoring). They are **parked for reference and are not part of the scored ladder**;
+new library-tier depth grows at L4–L5 instead. Renamed L6→A1, L7→A2, L8→A3.
+
+| Tier | Scenario | Character | Why parked |
+|------|----------|-----------|------------|
+| [A1](scenarios/A1-kanban-app/REQUIREMENTS.md) | Kanban app | Full app: data + rules + UI + E2E | Browser-graded |
+| [A2](scenarios/A2-kanban-sprints/REQUIREMENTS.md) | Kanban sprints | Iterative multi-sprint + regression | Browser-graded |
+| [A3](scenarios/A3-markdown-editor/REQUIREMENTS.md) | Markdown vault editor | Native desktop (Tauri) + SSH + security | Desktop/SSH-graded |
+
+A1 and A2 **share the same application**: A1 builds it once, A2 re-delivers it as
+five scripted sprints.
 
 ## Framework (shared contracts)
 
@@ -137,13 +151,13 @@ the shape of the fall-off. See `RUBRIC_FRAMEWORK.md §6`.
 
 ## Status & next pass
 
-**Requirements set:** all nine scenarios (L0–L8) are fully specified.
+**Requirements set:** all nine scenarios (L0–A3) are fully specified.
 
 **Grader layer:** the grading contract (`framework/GRADING.md`) turns each
 scenario's §6/§7 into a machine- and agent-checkable grader — a counted **check
 registry** (fixing the "what's the denominator?" ambiguity), a **gate-expression
 grammar** (the five gate shapes across the ladder), automated axes + AI-judge
-prompts for `QUA`/`FID`, and the nested `score.json` (incl. the L7 per-sprint
+prompts for `QUA`/`FID`, and the nested `score.json` (incl. the A2 per-sprint
 variant). A reference **runner** lives at `framework/harness/run_scenario.py`.
 
 **L0, L1, and L2 are fully-runnable, proven reference evals** — each ships
@@ -164,12 +178,12 @@ variant). A reference **runner** lives at `framework/harness/run_scenario.py`.
 The grader dependencies are in `framework/harness/requirements.txt`
 (`pytest`, `pyyaml`, `hypothesis`).
 
-**Next:** L5–L7 need live infra (server/browser/ssh fixtures) — the point where
+**Next:** L5–A2 need live infra (server/browser/ssh fixtures) — the point where
 the lightweight local runner gives way to the `amplifier-evaluation` driver +
-DTU-per-variant. L8's REQUIREMENTS are now **gradeable-in-spec** (concrete
+DTU-per-variant. A3's REQUIREMENTS are now **gradeable-in-spec** (concrete
 budgets, a declared `workspace-snapshots` regression mechanism, P0-tagged
 acceptance, and named perf/security gate authorities all landed), but a *runnable*
-L8 grader still needs a Tauri + SSH harness. No coding agent has been RUN against
+A3 grader still needs a Tauri + SSH harness. No coding agent has been RUN against
 the ladder yet — that is the driver layer.
 
 Run output (`runs/`, `score.json`, transcripts) is **gitignored** — only the eval

@@ -2,7 +2,7 @@
 
 A core teaching goal of this ladder: as complexity climbs, the amount of
 **product and design work that must surround the code** climbs with it. At L0 the
-spec *is* the truth and no discovery is warranted. At L7 you cannot deliver
+spec *is* the truth and no discovery is warranted. At A2 you cannot deliver
 responsibly without personas, a groomed backlog, evolving designs, and
 per-sprint acceptance. This document is the authoritative matrix; each scenario's
 §5 must be consistent with the row for its level.
@@ -11,7 +11,7 @@ per-sprint acceptance. This document is the authoritative matrix; each scenario'
 
 Legend: **R** = Required deliverable · **O** = Optional/Stretch · **—** = N/A for this rung.
 
-| Activity | L0 | L1 | L2 | L3 | L4 | L5 | L6 | L7 | L8 |
+| Activity | L0 | L1 | L2 | L3 | L4 | L5 | A1 | A2 | A3 |
 |----------|----|----|----|----|----|----|----|----|----|
 | **User research** ||||||||||
 | Stakeholder/user interviews | — | — | — | O | O | O | R | R | R |
@@ -54,10 +54,10 @@ Legend: **R** = Required deliverable · **O** = Optional/Stretch · **—** = N/
   audience; design centers on the public API and its examples.
 - **L5 (service):** JTBD for API consumers becomes required; data-model and API
   design are load-bearing; light product framing (PRD-lite + OpenAPI).
-- **L6 (app):** Full product+design surface — personas, wireframes → hi-fi, a
+- **A1 (app):** Full product+design surface — personas, wireframes → hi-fi, a
   design system, and accessibility become **required**, because the software now
   has human end-users whose experience is part of "working."
-- **L7 (iterative app):** Everything at L6 **plus** the continuous machinery of
+- **A2 (iterative app):** Everything at A1 **plus** the continuous machinery of
   iterative delivery — a groomed backlog, per-sprint goals and acceptance,
   usability feedback informing the next sprint, retrospectives, and design that
   *evolves* across sprints rather than being fixed up front.

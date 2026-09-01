@@ -17,7 +17,7 @@ A useful eval must let us answer, for a given strategy:
   multi-sprint application that needs iterative feature delivery?
 
 To answer those, we define a **ladder of scenarios** of increasing complexity
-(L0 → L8), each with fully specified requirements, a verification method, and a
+(L0 → A3), each with fully specified requirements, a verification method, and a
 scoring rubric. Two strategies run against the same ladder produce comparable
 scores. That comparability is the entire point.
 
@@ -53,20 +53,20 @@ L2     lru-cache                   Stateful unit + interface design. Time/evicti
 L3     log-analyzer                CLI: argv, files/stdin, exit codes, output formats.
 L4     template-engine             Multi-module library. Component composition + public API.
 L5     url-shortener               Stateful service: HTTP + persistence + concurrency.
-L6     kanban-app                  Full app: data model + business rules + UI + E2E.
-L7     kanban-sprints              Iterative multi-sprint delivery. Cumulative regression.
-L8     markdown-editor             Native desktop (Tauri) + remote SSH I/O + security + WYSIWYM.
+A1     kanban-app                  Full app: data model + business rules + UI + E2E.
+A2     kanban-sprints              Iterative multi-sprint delivery. Cumulative regression.
+A3     markdown-editor             Native desktop (Tauri) + remote SSH I/O + security + WYSIWYM.
 ```
 
-L6 and L7 deliberately **share the same application** (a Kanban board). L6 is the
-"build it once, correctly" test. L7 re-frames the *same* target as a scripted
+A1 and A2 deliberately **share the same application** (a Kanban board). A1 is the
+"build it once, correctly" test. A2 re-frames the *same* target as a scripted
 sequence of agile sprints, so we can measure iterative feature delivery and
 regression safety on a system the strategy has already had to reason about. This
 keeps the top of the ladder comparable across strategies: the app is fixed, only
 the delivery process changes.
 
-**L8 is a hand-curated capstone that sits above the graded ladder.** Where L0–L7
-are systematically graded, L8 is a bespoke top rung — a native **Tauri** desktop
+**A3 is a hand-curated capstone that sits above the graded ladder.** Where L0–A2
+are systematically graded, A3 is a bespoke top rung — a native **Tauri** desktop
 Markdown editor that reaches "vaults" over **SSH** — chosen because it stacks
 several new classes of difficulty the web-app rungs never touch: a native shell,
 remote and security-sensitive I/O, OS-config integration (`~/.ssh/config`,
@@ -89,10 +89,10 @@ L2     None                      Interface/API design    API contract
 L3     Light (usage scenarios)   CLI UX / output design  CLI spec + man-page
 L4     Light (consumer stories)  Public API design       API reference + examples
 L5     Medium (API consumers)    API + data model design PRD-lite + OpenAPI
-L6     Full (personas, JTBD)     Wireframes → hi-fi + DS  PRD + user stories + a11y
-L7     Full + continuous         Design evolves per      Backlog + sprint plans +
+A1     Full (personas, JTBD)     Wireframes → hi-fi + DS  PRD + user stories + a11y
+A2     Full + continuous         Design evolves per      Backlog + sprint plans +
        (per-sprint feedback)     sprint                  DoD + retros
-L8     Full (+ usability test)   Full + perf/motion +    PRD + backlog + threat
+A3     Full (+ usability test)   Full + perf/motion +    PRD + backlog + threat
        (hand-curated capstone)   security/threat model   model + perf budget
 ```
 
@@ -109,11 +109,11 @@ them is cheap now and expensive later, so flag any you disagree with.
 
 | # | Fork | Decision taken | Rationale |
 |---|------|----------------|-----------|
-| 1 | Language/stack | **Python** for L0–L5; **Python API + TypeScript/React SPA** for L6–L7. Harness is language-agnostic via a per-scenario `manifest.yaml`. | One primary toolchain keeps the harness small; full-stack only where the difficulty requires it. |
+| 1 | Language/stack | **Python** for L0–L5; **Python API + TypeScript/React SPA** for A1–A2. Harness is language-agnostic via a per-scenario `manifest.yaml`. | One primary toolchain keeps the harness small; full-stack only where the difficulty requires it. |
 | 2 | Scoring mode | **Hybrid**: automated objective gate (hard pass/fail) + rubric axes, where subjective axes (quality, design fidelity) use an LLM-judge and/or human scorer with anchored descriptors. | Pure automation can't score maintainability or design fidelity; pure human doesn't scale. |
 | 3 | Test visibility | **Three tiers**: `smoke` (visible to agent), `acceptance` (held-out, defines "working"), `adversarial` (hidden, run once, anti-overfitting). | Prevents strategies from gaming the eval by coding to the tests. |
 | 4 | Convergence telemetry | **Scored, first-class.** Iterations, wall-clock, token/$ cost, intervention count, failed-runs-before-pass, regressions are captured and feed rubric axes. | This is a *strategy* eval, not just a correctness eval. |
-| 5 | Top of ladder (L7) | **Fixed app + scripted sprint sequence** (not a fresh app per run). | Comparability across strategies. A fixed backlog isolates the strategy as the variable. |
+| 5 | Top of ladder (A2) | **Fixed app + scripted sprint sequence** (not a fresh app per run). | Comparability across strategies. A fixed backlog isolates the strategy as the variable. |
 
 ## 6. How a scenario is structured
 
@@ -149,7 +149,7 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
   floor, the run **fails outright** regardless of other axes — you cannot score
   well on unworking code.
 - Per-level **weight profiles** shift emphasis as you climb: L0 is almost all
-  Correctness; L7 is dominated by Regression Safety, Autonomy, and Convergence
+  Correctness; A2 is dominated by Regression Safety, Autonomy, and Convergence
   Efficiency.
 
 ## 8. How you'll use this
@@ -168,9 +168,9 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
 - Scenarios are not meant to be novel/unseen research problems; they are
   well-understood tasks chosen so that "working" is unambiguous and cheaply
   verifiable.
-- L8 is a hand-curated native-desktop capstone that adds OS/remote/security
-  surface (Tauri + SSH) beyond the systematically-graded L0–L7 ladder.
-- L6/L7 are "medium" apps by design — large enough to require iteration, small
+- A3 is a hand-curated native-desktop capstone that adds OS/remote/security
+  surface (Tauri + SSH) beyond the systematically-graded L0–A2 ladder.
+- A1/A2 are "medium" apps by design — large enough to require iteration, small
   enough to verify end-to-end in a bounded run.
 
 ## 10. Document map
@@ -186,5 +186,5 @@ Full detail in `framework/RUBRIC_FRAMEWORK.md`. In brief:
 | `framework/ARTIFACT_GRADIENT.md` | Which research/design/product artifacts apply per level |
 | `framework/GRADING.md` | The grader: check registry, gate-expression grammar, axis→score, AI-judge prompts |
 | `framework/HARNESS.md` | The runner + how to drive a strategy + run-output discipline |
-| `scenarios/L0..L8/REQUIREMENTS.md` | The nine scenario definitions |
+| `scenarios/L0..A3/REQUIREMENTS.md` | The nine scenario definitions |
 | `scenarios/L0-*/{SPEC,manifest,rubric,EVALUATION}.*` + `tests/` | The proven L0 reference eval |

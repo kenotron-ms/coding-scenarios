@@ -305,7 +305,7 @@
 
 - **3.4 Accessibility** — **N/A** — no required human-facing UI. If the optional
   landing form (§5.3) is produced it is a stretch artifact and is not scored for
-  WCAG conformance at this rung; a11y becomes Required at L6.
+  WCAG conformance at this rung; a11y becomes Required at A1.
 
 - **3.5 Maintainability**
   - **NFR-5.** `ruff` and `pyright` clean. Layered per §2.2 with the storage seam
@@ -397,7 +397,7 @@ Consistent with the **L5 row** of `framework/ARTIFACT_GRADIENT.md`.
   - **Prioritized backlog — Optional/Stretch.** The FR set is small and fully
     known; grooming it would be ceremony.
   - **Sprint plans / retrospectives — N/A** — single delivery, no iteration
-    protocol at this rung (that is L7).
+    protocol at this rung (that is A2).
 
 - **5.3 Interaction / visual design**
   - **Interface/API contract design — Required.** `design/openapi.yaml` is the
@@ -409,7 +409,7 @@ Consistent with the **L5 row** of `framework/ARTIFACT_GRADIENT.md`.
     never exercised by acceptance.
   - **Interaction/state specs — Optional/Stretch.** A short state note for the link
     lifecycle (`created → clicked* → deleted`) is welcome.
-  - **Hi-fi mockups, design tokens, a11y annotations — N/A** — L6 concerns.
+  - **Hi-fi mockups, design tokens, a11y annotations — N/A** — A1 concerns.
 
 - **5.4 Design artifacts to produce**
   | File | Required? | Scored under |
