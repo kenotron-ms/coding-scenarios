@@ -1,24 +1,24 @@
-# L7 — Kanban Sprints — REQUIREMENTS
+# A2 — Kanban Sprints — REQUIREMENTS
 
 > Capstone rung. Follows `framework/REQUIREMENTS_TEMPLATE.md`; scored per
 > `framework/RUBRIC_FRAMEWORK.md`; verified per `framework/VERIFICATION_CONTRACT.md`;
-> artifact obligations per `framework/ARTIFACT_GRADIENT.md` row **L7**.
+> artifact obligations per `framework/ARTIFACT_GRADIENT.md` row **A2**.
 >
-> **Relationship to L6.** L7 delivers the *same application* as
-> `scenarios/L6-kanban-app` — same personas, same data model, same endpoint
-> surface, same NFR floors. Nothing here contradicts L6; L7 only changes the
+> **Relationship to A1.** A2 delivers the *same application* as
+> `scenarios/A1-kanban-app` — same personas, same data model, same endpoint
+> surface, same NFR floors. Nothing here contradicts A1; A2 only changes the
 > **delivery process** from "build it once" to "build it in five scripted
 > sprints, and never break what you already shipped." Where this document
-> restates L6 material it is for self-containment; where the two disagree, L6 is
-> authoritative for the *application* and L7 is authoritative for the *process*.
+> restates A1 material it is for self-containment; where the two disagree, A1 is
+> authoritative for the *application* and A2 is authoritative for the *process*.
 
 ---
 
 ## 0. Scenario Summary
 
-- **Level:** L7 (top of ladder)
-- **Codename / dir:** `L7-kanban-sprints`
-- **One-liner:** Deliver the L6 Kanban application as a scripted sequence of five
+- **Level:** A2 (top of ladder)
+- **Codename / dir:** `A2-kanban-sprints`
+- **One-liner:** Deliver the A1 Kanban application as a scripted sequence of five
   agile sprints, each adding features against its own acceptance criteria, while
   a **cumulative regression suite** assembled from all prior sprints must stay
   **100% green at every sprint boundary**.
@@ -28,7 +28,7 @@
   acceptance, usability feedback that feeds the next sprint, retrospectives, and
   design that *evolves* per sprint rather than being fixed up front. Every rung
   below asks "can you get it working?" This rung asks **"can you keep working
-  software working while you extend it?"** That is the entire point of L7, and
+  software working while you extend it?"** That is the entire point of A2, and
   it is why `REG` carries more weight here than `COR`.
 - **Estimated reference solution size:** cumulative **3,000–4,500 LoC across
   45–70 files** at Sprint 4, plus ~25 product/design artifact files. Per-sprint
@@ -87,9 +87,9 @@ exists to evaluate.
 
 ### 1.2 Target users / personas
 
-**Required** artifact (`ARTIFACT_GRADIENT.md` L7). The strategy must author these
+**Required** artifact (`ARTIFACT_GRADIENT.md` A2). The strategy must author these
 into `design/research/personas.md`; the four below are the canonical set carried
-over from L6 and must be preserved, not replaced.
+over from A1 and must be preserved, not replaced.
 
 | Persona | Role | Primary jobs | Sprints that serve them |
 |---------|------|--------------|-------------------------|
@@ -301,7 +301,7 @@ invariant, not the choice.
 
 ### 1.7 SPRINT SEQUENCE — the scripted delivery plan
 
-This is the spine of L7. The sequence is **fixed** (`VISION.md` §5, fork 5): a
+This is the spine of A2. The sequence is **fixed** (`VISION.md` §5, fork 5): a
 fixed app + fixed sprint script isolates the *strategy* as the only variable, so
 two strategies produce comparable scores. The strategy does not get to reorder,
 merge, or skip sprints. It grooms and estimates *within* each sprint's backlog.
@@ -454,7 +454,7 @@ still exactly where I left it."*
 authenticated user**. The harness supplies a logged-in session to prior-sprint
 suites; every Sprint 0/1 assertion must otherwise be unchanged. Specifically
 watched: drag/move endpoints still work identically behind auth (the most common
-L7 regression is an authz refactor that quietly breaks `move`), and dense
+A2 regression is an authz refactor that quietly breaks `move`), and dense
 ordering survives migration `0003`.
 
 ---
@@ -571,7 +571,7 @@ there.
 
 ### 2.1 Interface / API contract
 
-Same surface as L6, introduced incrementally. Every endpoint below is permanent
+Same surface as A1, introduced incrementally. Every endpoint below is permanent
 from the sprint that introduces it.
 
 ```
@@ -750,12 +750,12 @@ user 1───* board 1───* column 1───* card *───* label
 
 `kind: web-app`. The harness starts the backend and the built frontend, waits for
 health, then runs API + browser suites against the **live application** — the
-real path, per `VERIFICATION_CONTRACT.md` §3. Two additional hooks exist at L7
+real path, per `VERIFICATION_CONTRACT.md` §3. Two additional hooks exist at A2
 that lower rungs do not have: `migrate_cmd` (so migration-safety probes can run)
 and per-sprint suite selection.
 
 ```yaml
-# scenarios/L7-kanban-sprints/manifest.yaml   (authored in the harness pass)
+# scenarios/A2-kanban-sprints/manifest.yaml   (authored in the harness pass)
 level: 7
 language: python+typescript
 workspace: solution/
@@ -766,7 +766,7 @@ entrypoint:
   health_path: "/api/health"         # must report {status, version, schema_version}
   ready_timeout_s: 60
   e2e_runner: "npx playwright test"
-  migrate_cmd: "make migrate"        # L7-specific: applies forward migrations
+  migrate_cmd: "make migrate"        # A2-specific: applies forward migrations
   reset_cmd: "make reset-db"         # drops + re-migrates a throwaway DB
 sprints: [0, 1, 2, 3, 4]
 verify:
@@ -796,7 +796,7 @@ regardless of feature completeness — the harness cannot score what it cannot s
 ## 3. Non-Functional Requirements
 
 Every NFR is in force from the sprint listed and **every sprint thereafter**.
-NFR-8/9/10 are the L7-specific additions on top of L6's set.
+NFR-8/9/10 are the A2-specific additions on top of A1's set.
 
 - **NFR-1 Performance** *(from S0)* — On the harness fixture (3 boards, 5 columns
   × 50 cards each):
@@ -986,9 +986,9 @@ five DoDs satisfied.
 
 ## 5. Discovery & Design Activities
 
-Per `ARTIFACT_GRADIENT.md` row **L7**, *every* discovery/product/design activity
+Per `ARTIFACT_GRADIENT.md` row **A2**, *every* discovery/product/design activity
 on the matrix is **Required** here — including Usability testing, which is
-Optional at L6 and Required at L7 — plus the four L7-only rows (sprint plans,
+Optional at A1 and Required at A2 — plus the four A2-only rows (sprint plans,
 retrospectives, per-sprint feedback, evolving design).
 
 ### 5.1 User research — **Required**
@@ -998,7 +998,7 @@ retrospectives, per-sprint feedback, evolving design).
 | Stakeholder/user interviews | **Required** | ≥ 3 interview write-ups grounded in the §1.2 personas: context, current workaround, pains, quotes, implications | Inception, before Sprint 0 |
 | Jobs-to-be-done | **Required** | ≥ 5 JTBD statements (`When ___, I want ___, so I can ___`), each mapped to backlog items | Inception; revisited at each grooming |
 | Personas | **Required** | The four §1.2 personas, fleshed out; carried forward unchanged across sprints (drift is a `FID` penalty) | Inception |
-| **Usability testing** | **Required** (L7-only) | A scripted evaluation **against the running app** after Sprints 1, 2, 3 | End of S1, S2, S3 |
+| **Usability testing** | **Required** (A2-only) | A scripted evaluation **against the running app** after Sprints 1, 2, 3 | End of S1, S2, S3 |
 
 **Usability evaluation protocol** (be honest about what this is): there are no
 live human participants inside an eval run. The strategy therefore runs a
@@ -1023,9 +1023,9 @@ is **scored on rigor and traceability, not on being genuine user research**:
 | PRD | **Required** | Problem, personas, scope, success metrics, release plan across the five sprints; written at inception, amended (not rewritten) as sprints land |
 | User stories | **Required** | §1.3 as the seed; expanded with estimates and acceptance in the backlog |
 | **Prioritized backlog** | **Required** | ONE `backlog.md` spanning all five sprints, groomed at inception and **re-groomed at every sprint boundary**: ranked, estimated, sprint-sliced, with carried/closed/added items visible over time |
-| **Sprint plans + goals** | **Required** (L7-only) | One per sprint: a single-sentence sprint goal, the committed slice, AC, DoD, and named risks |
+| **Sprint plans + goals** | **Required** (A2-only) | One per sprint: a single-sentence sprint goal, the committed slice, AC, DoD, and named risks |
 | Definition of Done | **Required** | `dod.md`, the §4.2 checklist, applied and evidenced per sprint |
-| **Retrospectives** | **Required** (L7-only) | One per sprint: what went well, what didn't, **what regression risk was discovered**, and ≥ 1 concrete action carried into the next sprint's backlog. A retro that names no regression risk after a sprint that had one is a `FID` penalty |
+| **Retrospectives** | **Required** (A2-only) | One per sprint: what went well, what didn't, **what regression risk was discovered**, and ≥ 1 concrete action carried into the next sprint's backlog. A retro that names no regression risk after a sprint that had one is a `FID` penalty |
 
 The backlog is the load-bearing product artifact at this rung. It must show
 **history**: an item that appears fully-formed in Sprint 4 with no prior
@@ -1034,7 +1034,7 @@ vanishes without being closed or explicitly dropped.
 
 ### 5.3 Interaction / visual design — **Required, and it must EVOLVE per sprint**
 
-The distinguishing L7 obligation: design is **not** finished before Sprint 0. It
+The distinguishing A2 obligation: design is **not** finished before Sprint 0. It
 grows with the product, one increment per sprint, and each increment must be
 dated and logged in `CHANGELOG-design.md`.
 
@@ -1104,9 +1104,9 @@ Optional/stretch (not required, not penalized if absent): ADRs under
 ### 6.1 Test tiers
 
 Standard three tiers (`VERIFICATION_CONTRACT.md` §1), **instantiated five times**
-— once per sprint — plus the L7-specific cumulative regression tier.
+— once per sprint — plus the A2-specific cumulative regression tier.
 
-| Tier | Visible? | L7 instantiation |
+| Tier | Visible? | A2 instantiation |
 |------|----------|------------------|
 | `smoke` | **Yes** | Per sprint, 5–8 visible happy-path checks handed over with that sprint's SPEC slice. Enough to self-check; nowhere near enough to define done. |
 | `acceptance` | **No** — held out | Per sprint, the full criteria matrix from §1.7 (AC-N.*), run at that sprint's boundary against the live app. This is that sprint's definition of "working." |
@@ -1150,13 +1150,13 @@ Notes:
   scored as `Failed`, and the telemetry records the **sprint frontier** — the
   highest boundary passed. `frontier = 2` ("passed through auth, died on
   filters") is far more informative than a single failing number, and it is the
-  L7 analogue of the ladder profile itself.
+  A2 analogue of the ladder profile itself.
 - `adversarial` never gates. It feeds `COR`/`ROB`.
 - The scenario passes only when Sprint 4's boundary passes.
 
 ### 6.3 Verification mechanics
 
-The real path at L7 is the running application: real HTTP against a real server
+The real path at A2 is the running application: real HTTP against a real server
 with real persistence, plus a real browser driving the real DOM.
 
 ```
@@ -1233,7 +1233,7 @@ user's board.
 
 ### 6.4 Anti-gaming measures
 
-L7 has more gaming surface than any lower rung, because the strategy is being
+A2 has more gaming surface than any lower rung, because the strategy is being
 asked to keep an ever-growing suite green.
 
 | Vector | Detection | Consequence |
@@ -1263,7 +1263,7 @@ the gate), and the score is dominated by **whether you stayed correct** (`REG`),
 | **Weight** | **15** | **10** | **20** | **20** | **12** | **18** | **5** |
 
 `REG` at 18 is the highest on the ladder, and `COR` at 15 the lowest, by design:
-at L7 correct-at-a-point-in-time is table stakes enforced by the gate, while
+at A2 correct-at-a-point-in-time is table stakes enforced by the gate, while
 *correct-after-four-more-sprints* is the thing being measured. `FID` dips to 5
 (per `RUBRIC_FRAMEWORK.md` §3) because the sprint backlog, not a static design,
 carries acceptance here — but note that missing required artifacts still **caps**
@@ -1282,7 +1282,7 @@ combination of a capped `FID` and a mediocre `QUA`.
 | **REG** | ≥ 1 regression at a boundary, or a scar bug re-introduced, or a gaming event on the suites | Prior-sprint assertions broke *during* a sprint and were repaired before the boundary (≥ 3 intra-sprint regressions or ≥ 1 oscillation) | Zero regressions at every boundary, zero intra-sprint regressions surviving more than one iteration, zero oscillations, zero scar failures, all migration probes clean |
 | **FID** | Required artifacts largely absent, or artifacts contradict what shipped | Artifacts exist but are thin: backlog not re-groomed, retros generic, usability findings not traced into the next sprint, design retro-fitted | All §5.4 files present and *timestamped to their sprint*; backlog shows real grooming history; retros name real regression risks; usability findings visibly change the next sprint's backlog; design diff matches implementation; WCAG AA held every sprint |
 
-#### 7.2.1 Aggregation across sprints — **the L7-specific rule**
+#### 7.2.1 Aggregation across sprints — **the A2-specific rule**
 
 Each sprint is scored independently on all seven axes, then the scenario score is
 the **mean of the five sprint scores** — so a strong Sprint 0 cannot hide a
@@ -1303,7 +1303,7 @@ if any boundary N shows a prior-sprint acceptance assertion failing
 Why the cap is scenario-wide rather than sprint-local: **keeping software working
 across iterations is the entire proposition of this rung.** A strategy that
 breaks Sprint 1's ordering while building Sprint 3's filters has demonstrated the
-exact failure mode L7 exists to detect, and it should not be able to average that
+exact failure mode A2 exists to detect, and it should not be able to average that
 away with four tidy sprints. With `REG` weighted 18, the cap costs ≥ 13.5 points
 outright plus a band demotion — enough to move a "Converged" run to
 "Converged-Rough" or below, which is the honest description of that strategy.
@@ -1341,13 +1341,13 @@ on_failure       = halt; scenario = Failed; record frontier_sprint
 ```
 
 This is the strictest gate on the ladder, and matches `RUBRIC_FRAMEWORK.md` §4's
-L7 row exactly. It is strict because it is the *only* thing that makes L7's
+A2 row exactly. It is strict because it is the *only* thing that makes A2's
 central claim measurable: you do not get to call it converged if last sprint's
 feature is broken.
 
 ### 7.4 Pass threshold
 
-**68** — the score at/above which L7 counts as "converged" for ladder-profile
+**68** — the score at/above which A2 counts as "converged" for ladder-profile
 purposes.
 
 68 sits inside the **Converged-Rough** band (55–69), and that is deliberate.
@@ -1378,7 +1378,7 @@ COR 4 (15.0) + ROB 2 (5.0) + EFF 2 (10.0) + AUT 3 (15.0)
 
 ### 8.1 Healthy convergence
 
-What a strong strategy's L7 trace looks like:
+What a strong strategy's A2 trace looks like:
 
 - **Inception is short and real.** Personas, JTBD, PRD, and a groomed five-sprint
   backlog land inside the 30-minute block. The backlog is ranked and sliced
@@ -1391,7 +1391,7 @@ What a strong strategy's L7 trace looks like:
   soft budget even as the codebase triples. A strategy with real regression
   discipline gets *faster* as its test scaffolding grows, not slower.
 - **It runs the cumulative suite itself, unprompted, before declaring done.** The
-  strongest single predictor of a clean L7: the strategy re-runs its own
+  strongest single predictor of a clean A2: the strategy re-runs its own
   prior-sprint tests as part of every sprint's inner loop, not just at the end.
 - **Migrations are written before the model changes**, and the strategy tests the
   upgrade path on a populated database rather than a fresh one.
@@ -1410,7 +1410,7 @@ What a strong strategy's L7 trace looks like:
 |---------|--------------------|-------------------|
 | **Regression explosion** | Iterations flat at S0–S1, then a spike at S2/S3 as every change breaks two prior things — complexity compounding faster than the strategy's ability to hold it | `iterations[N]` curve steepens; `regressions_intra_sprint[N]` climbs; boundary time grows |
 | **Re-introducing fixed bugs** | A bug fixed in S1 returns in S3 because the fix lived in a branch the refactor deleted | Scar suite failures; `oscillations` |
-| **Rescue-reliance ramp** | Zero interventions at S0, one `clarify` at S2, a `hint` at S3, a `rescue` at S4 — the classic L7 signature of a strategy at its ceiling | `interventions[N]` by sprint and severity; `AUT` capped |
+| **Rescue-reliance ramp** | Zero interventions at S0, one `clarify` at S2, a `hint` at S3, a `rescue` at S4 — the classic A2 signature of a strategy at its ceiling | `interventions[N]` by sprint and severity; `AUT` capped |
 | **Rewrite-per-sprint** | Rather than integrate, the strategy re-derives the app each sprint. Boundaries may pass, but nothing accumulates and cost explodes | Churn > 60% of prior-sprint files; `dead_ends`; `tokens[N]` climbing |
 | **Design drift** | Shipped UI diverges from `design/`; a11y annotations stop being updated after S1; hi-fi mockups only ever describe S0 | Design-diff review; `CHANGELOG-design.md` gaps |
 | **Backlog drift** | Items appear fully-formed in the sprint that closes them; S0 items vanish without being closed; the backlog is never re-groomed | Backlog diff across boundary tags |
@@ -1421,14 +1421,14 @@ What a strong strategy's L7 trace looks like:
 
 ### 8.3 Instrumentation notes
 
-Beyond the shared `CONVERGENCE_METRICS.md` set, L7 captures **everything
+Beyond the shared `CONVERGENCE_METRICS.md` set, A2 captures **everything
 per sprint** — the whole value of this rung is seeing *where* along the sprint
 sequence a strategy falls off, which is the same shape as the ladder profile
 itself, one level down.
 
 | Metric | Granularity | Why |
 |--------|-------------|-----|
-| `iterations[N]`, `wall_clock_s[N]`, `tokens[N]`, `usd[N]` | per sprint | The **cost curve** across sprints is the headline L7 signal |
+| `iterations[N]`, `wall_clock_s[N]`, `tokens[N]`, `usd[N]` | per sprint | The **cost curve** across sprints is the headline A2 signal |
 | `failed_runs_before_pass[N]` | per sprint | Friction growth as the system compounds |
 | `regressions_at_boundary[N]` | per sprint | Gate + the scenario-wide `REG` cap |
 | `regressions_intra_sprint[N]` | per sprint | Early warning; distinguishes "noticed and fixed" from "never noticed" |
@@ -1443,14 +1443,14 @@ itself, one level down.
 | `realtime_p95_ms` | S4 | NFR-9 |
 | `migration_probe_pass[N]` | per boundary | NFR-10 |
 | `artifact_presence[N]` | per boundary | Which §5.4 files existed *at that boundary*, by timestamp — catches retro-fitting |
-| `frontier_sprint` | run | Highest boundary passed; the L7 analogue of the convergence frontier |
+| `frontier_sprint` | run | Highest boundary passed; the A2 analogue of the convergence frontier |
 
 `score.json` extends the shape in `VERIFICATION_CONTRACT.md` §6 with a per-sprint
 array so the fall-off is legible at a glance:
 
 ```json
 {
-  "scenario": "L7-kanban-sprints",
+  "scenario": "A2-kanban-sprints",
   "strategy": "example-harness@v3",
   "gate": {"acceptance_floor": 1.0, "regression_floor": 1.0,
            "passed": false, "frontier_sprint": 3},
@@ -1479,5 +1479,5 @@ array so the fall-off is legible at a glance:
 
 That trace reads at a glance: *this strategy climbed three sprints, then the
 Sprint-3 filter work wrote back card positions and broke ordering it had shipped
-two sprints earlier.* That sentence — not a number — is what L7 exists to
+two sprints earlier.* That sentence — not a number — is what A2 exists to
 produce.

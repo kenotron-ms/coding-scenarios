@@ -1,21 +1,21 @@
-# L6 — Kanban App — REQUIREMENTS
+# A1 — Kanban App — REQUIREMENTS
 
 > Follows `framework/REQUIREMENTS_TEMPLATE.md`; scored per
 > `framework/RUBRIC_FRAMEWORK.md`; verified per `framework/VERIFICATION_CONTRACT.md`;
-> artifact obligations per `framework/ARTIFACT_GRADIENT.md` row **L6**.
+> artifact obligations per `framework/ARTIFACT_GRADIENT.md` row **A1**.
 
-> **L6 and L7 share this application.** L6 is *"build it once, correctly"* — the
-> whole app delivered in a single run against a fixed spec. L7 re-delivers **the
+> **A1 and A2 share this application.** A1 is *"build it once, correctly"* — the
+> whole app delivered in a single run against a fixed spec. A2 re-delivers **the
 > same product** as a scripted sequence of sprints in order to measure iterative
 > delivery and cumulative regression safety. Therefore **the data model, API
 > contract, ordering semantics, and P0 feature set defined here are the
-> baseline** that L7 builds on and extends (real-time sync, comments, activity
+> baseline** that A2 builds on and extends (real-time sync, comments, activity
 > feed, search/filter — deliberately deferred in §1.5). Changes to §2.1/§2.3 are
 > breaking changes for two rungs, not one.
 
 ## 0. Scenario Summary
-- **Level:** L6
-- **Codename / dir:** `L6-kanban-app`
+- **Level:** A1
+- **Codename / dir:** `A1-kanban-app`
 - **One-liner:** Build a single-team Kanban board web application — Python REST
   API plus a React/TypeScript SPA — with boards, columns and cards,
   drag-and-drop reordering that persists across reload, durable storage, and
@@ -67,7 +67,7 @@
   are actively hurt by, a heavyweight project-management tool: the entire value
   is that the board stays as fast and as legible as the wall it replaces.
 
-- **1.2 Target users / personas** — **Required** (`ARTIFACT_GRADIENT.md` L6).
+- **1.2 Target users / personas** — **Required** (`ARTIFACT_GRADIENT.md` A1).
   Three personas; the first two are primary, the third is a constraint-bearing
   persona that exists to make the accessibility requirements concrete rather
   than abstract. The delivered `design/personas.md` must cover at least these
@@ -263,7 +263,7 @@
 
 - **1.5 Out of scope** — Explicit non-goals. Building any of these costs
   `FID` (scope creep against the PRD) even if implemented well.
-  - **Deferred to L7 (this is the L7 sprint backlog — do not pre-build):**
+  - **Deferred to A2 (this is the A2 sprint backlog — do not pre-build):**
     real-time multi-user sync (WebSocket/polling live updates), comments on
     cards, an activity/audit feed, and search/filter across cards.
   - **Out of the product entirely:** multi-team or organization concepts;
@@ -298,7 +298,7 @@
 ## 2. Technical Requirements
 
 - **2.1 Interface / API contract** — The REST surface is **pinned**; it is the
-  shared contract between L6 and L7 and the acceptance suite calls it directly.
+  shared contract between A1 and A2 and the acceptance suite calls it directly.
   Paths, methods, status codes and the `move` semantics are not negotiable.
   Payload fields may be *added* but not renamed or removed.
 
@@ -397,7 +397,7 @@
   - **Backend layering** — routing/serialization, business logic, and
     persistence are separable. Ordering logic lives in **one** module (e.g.
     `ordering.py`) and is the single writer of position values; route handlers
-    must not compute positions inline. Rationale: L7 will extend this and the
+    must not compute positions inline. Rationale: A2 will extend this and the
     invariants must have one home.
   - **Server is the source of truth for order.** The client may render an
     optimistic order, but every persisted order originates from a server
@@ -418,7 +418,7 @@
 
 - **2.3 Data model** — Four entities. The schema below is the **reference
   shape**; column names are pinned for `users`, `boards`, `columns`, `cards`
-  because L7 extends this schema. Label storage is §1.6(c); the `position`
+  because A2 extends this schema. Label storage is §1.6(c); the `position`
   representation is §1.6(a) (the type shown is one legal choice).
 
   ```sql
@@ -518,7 +518,7 @@
   no manual step.
 
   ```yaml
-  # scenarios/L6-kanban-app/manifest.yaml   (authored in the harness pass)
+  # scenarios/A1-kanban-app/manifest.yaml   (authored in the harness pass)
   level: 6
   language: python+typescript
   workspace: solution/
@@ -621,7 +621,7 @@
   - **Error output:** no stack traces, SQL, or file paths in any API response.
 
 - **NFR-4 Accessibility — REQUIRED, WCAG 2.1 Level AA.** This is a P0 quality
-  bar at L6, not a stretch goal. It is verified by an automated scan **and** a
+  bar at A1, not a stretch goal. It is verified by an automated scan **and** a
   scripted keyboard-only path (§6.3).
 
   | # | Requirement | WCAG ref |
@@ -790,8 +790,8 @@
 
 ## 5. Discovery & Design Activities
 
-L6 is the rung where the **full product and design surface becomes required**
-(`ARTIFACT_GRADIENT.md` L6). Missing a Required artifact caps `FID` and can drop
+A1 is the rung where the **full product and design surface becomes required**
+(`ARTIFACT_GRADIENT.md` A1). Missing a Required artifact caps `FID` and can drop
 the run below its pass threshold even if every functional test passes — at this
 rung, "working" includes "meets the product and design intent."
 
@@ -820,10 +820,10 @@ interviews with named "real" users and presenting them as field data is a
   | Spec / acceptance criteria | **Required** | This document is the source spec; the deliverable is the traceability from `design/` artifacts back to `FR`/`AC` ids. |
   | PRD | **Required** | `design/prd.md`: problem, target users, goals and non-goals (consistent with §1.5), success metrics, scope by release, key risks, and open questions with their §1.6 resolutions. |
   | User stories | **Required** | `design/user-stories.md`: US-1..US-21 (§1.3) or a superset, each with per-story acceptance criteria. |
-  | Prioritized backlog | **Required** | `design/backlog.md`: every story sized and ordered into **P0** and **P1** matching §4.1, with dependencies made explicit (auth before boards; persistence before drag; drag before keyboard-move polish). This backlog is the seed for L7's sprint plans. |
-  | Sprint plans + goals | **N/A** — L6 is a single continuous delivery. Iterative sprint machinery is exactly what L7 adds; producing sprint plans here is out of scope, not bonus credit. |
+  | Prioritized backlog | **Required** | `design/backlog.md`: every story sized and ordered into **P0** and **P1** matching §4.1, with dependencies made explicit (auth before boards; persistence before drag; drag before keyboard-move polish). This backlog is the seed for A2's sprint plans. |
+  | Sprint plans + goals | **N/A** — A1 is a single continuous delivery. Iterative sprint machinery is exactly what A2 adds; producing sprint plans here is out of scope, not bonus credit. |
   | Definition of Done | **Required** | §4.2 restated in `design/prd.md` (or linked), as the checklist the strategy actually ran against. |
-  | Retrospective artifacts | **N/A** — no iteration boundary to retrospect on at this rung (L7). |
+  | Retrospective artifacts | **N/A** — no iteration boundary to retrospect on at this rung (A2). |
 
 - **5.3 Interaction / visual design**
   | Activity | Status | What it means here |
@@ -1051,7 +1051,7 @@ scores `COR` = 0.
   15 each because a four-hour, multi-surface build is where thrash and
   human-rescue actually show up. `FID` rises to 12 because there is now a real
   product/design surface to be faithful to. `REG` enters at 12 as the bridge to
-  L7: L6 has no sprints, so regression is measured *within* the run — see §7.2.
+  A2: A1 has no sprints, so regression is measured *within* the run — see §7.2.
 
 - **7.2 Per-axis scoring guide** (scenario-specific anchors)
 
@@ -1065,7 +1065,7 @@ scores `COR` = 0.
   | **REG** | Later features visibly broke earlier ones: drag persistence or authz criteria fail *after* labels/assignee/polish were added; repeated `oscillations` on the same behavior. | 1–2 regressions introduced and fixed, or one earlier-group criterion still failing at declared-done; mid-run snapshots show the app non-bootable for long stretches. | `regressions_introduced` = 0 and `oscillations` = 0; every mid-run snapshot boots and passes the then-complete feature set; earlier P0 groups still green after all P1 work. |
   | **FID** | A required §5.4 artifact is missing, or artifacts were written post-hoc to describe whatever got built, or research is fabricated as real field data. | Artifacts all present but thin or drifting: mockups the UI ignores, a token file the CSS doesn't import, a backlog that doesn't match §4.1, `moderate` axe findings unexplained. | Every artifact present, consistent, and traceable to FR/AC ids; the UI matches the hi-fi across all seven screens/states; tokens genuinely drive the styling; a11y annotations match the shipped ARIA and keyboard behavior; zero serious/critical axe violations. |
 
-  **REG at L6 — how it is measured despite there being no sprints.** Three
+  **REG at A1 — how it is measured despite there being no sprints.** Three
   sources: (1) telemetry `regressions_introduced` and `oscillations` across the
   run; (2) **feature-group replay** — acceptance criteria are grouped in the
   §4.1 build order (auth → boards → columns → cards → drag/persistence → authz
@@ -1084,11 +1084,11 @@ scores `COR` = 0.
   zeroes `QUA`/`FID`.
 
 - **7.4 Pass threshold** — **68.** Lower than the algorithmic rungs by design:
-  L6 has seven live axes, an irreducibly subjective `FID` component, and enough
+  A1 has seven live axes, an irreducibly subjective `FID` component, and enough
   surface that a legitimately good run will have visible rough edges. A run at
   68–84 is a genuine "Converged"; 85+ here (Converged-Clean) means the strategy
   built a whole application, with its product and design surface, essentially
-  cleanly in one pass — and is a strong predictor of surviving L7.
+  cleanly in one pass — and is a strong predictor of surviving A2.
 
 ## 8. Convergence Signals
 
@@ -1153,21 +1153,21 @@ scores `COR` = 0.
   - **Asking for product decisions.** A `clarify` on §1.6 is scored gently
     (§0) but still costs `AUT`; the rung is partly testing whether a strategy
     can make and document a defensible product call unaided.
-  - **Scope creep into L7.** Building live sync, comments, an activity feed, or
+  - **Scope creep into A2.** Building live sync, comments, an activity feed, or
     search because they "obviously belong." Costs `FID` (§1.5) and `EFF`, and
-    contaminates the L7 comparison.
+    contaminates the A2 comparison.
 
 - **8.3 Instrumentation notes** — Beyond the shared `CONVERGENCE_METRICS.md`
   set, capture into `score.json.notes`:
   1. **`resolution_profile`** — which branch of §1.6(a)–(h) was taken, whether
      each was documented in `DECISIONS.md`, and whether it was applied
      consistently. This makes product judgment comparable across strategies and
-     is the input L7 inherits.
+     is the input A2 inherits.
   2. **`stack_profile`** — backend framework, ORM/driver, DnD library, state
      store, styling approach, and direct-dependency counts.
   3. **`first_e2e_iteration`** and **`first_persistence_iteration`** — the
      iteration indices at which a browser test and a real DB write first ran.
-     Early values are the strongest predictor of a clean L6 (§8.1).
+     Early values are the strongest predictor of a clean A1 (§8.1).
   4. **`build_order`** — the observed order in which the §4.1 feature groups
      reached green, plus the wall-clock at which the discovery artifacts landed.
   5. **Mid-run snapshots** — up to three workspace samples (at ~25%/50%/75% of

@@ -16,7 +16,7 @@ It exists to close three defects found in review:
    ladder (plain floor; floor + named non-negotiable; P0-criteria + overall;
    per-sprint + cumulative regression; P0 + perf + security + overall). → **The
    gate expression grammar (§4) expresses all of them.**
-3. **Flat `score.json` can't represent L7.** → **The nested score schema + L7
+3. **Flat `score.json` can't represent A2.** → **The nested score schema + A2
    per-sprint variant (§7).**
 
 ---
@@ -33,7 +33,7 @@ is the explicit criteria↔assertion mapping the gates need.
 Row schema (one per assertion):
 
 ```yaml
-- id: L6-AC09-a            # stable, unique within scenario
+- id: A1-AC09-a            # stable, unique within scenario
   criterion: AC-9          # the acceptance criterion this rolls up to
   traces: [FR-22, INV-4]   # requirements this proves (from REQUIREMENTS §4.3)
   tier: acceptance         # smoke | acceptance | adversarial | regression
@@ -61,7 +61,7 @@ Rules:
 ## 2. `rubric.yaml` shape
 
 ```yaml
-scenario: L6-kanban-app
+scenario: A1-kanban-app
 weights: {COR: 22, ROB: 12, EFF: 15, AUT: 15, QUA: 12, REG: 12, FID: 12}  # sum 100
 pass_threshold: 68
 denominators:                       # explicit; the fix for the defect
@@ -77,7 +77,7 @@ judge:                              # AI-graded axes (see §6)
   QUA: {agent: grader, rubric: rubric/qua.md}
   FID: {agent: grader, rubric: rubric/fid.md, inputs: [design/hifi/]}
 checks:                             # the registry (§1) — inline or in EVALUATION.md
-  - {id: L6-AC01-a, criterion: AC-1, tier: acceptance, priority: P0, axis: [COR], weight: 1}
+  - {id: A1-AC01-a, criterion: AC-1, tier: acceptance, priority: P0, axis: [COR], weight: 1}
   # ...
 ```
 
@@ -127,9 +127,9 @@ L0–L2   acceptance_pass == 1.0
 L1      acceptance_pass == 1.0 and check:L1-CSVLIB-none    # stdlib csv forbidden
 L3–L4   acceptance_pass >= 0.95
 L5      acceptance_pass >= 0.95 and check:L5-NFR2-concurrency
-L6      p0_pass == 1.0 and acceptance_pass >= 0.90
-L8      p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok
-L7      per-sprint: acceptance_pass == 1.0 and regression_pass == 1.0   # see §7 variant
+A1      p0_pass == 1.0 and acceptance_pass >= 0.90
+A3      p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok
+A2      per-sprint: acceptance_pass == 1.0 and regression_pass == 1.0   # see §7 variant
 ```
 
 Gate false ⇒ run scored **Failed (0 overall)** regardless of axes
@@ -148,8 +148,8 @@ Gate false ⇒ run scored **Failed (0 overall)** regardless of axes
 | `rerun-matrix` | L3 | re-run the full flag/format matrix; behavior must be stable across invocations. |
 | `per-group-diff` | L4 | after each feature group lands, prior groups' checks must still pass. |
 | `two-pass-persistence` | L5 | cold-DB pass + carried-over-DB pass; state must survive. |
-| `workspace-snapshots` | L6 | prior acceptance re-run at mid-build snapshots. |
-| `cumulative-union` | L7 | union of all prior sprints' acceptance runs at each sprint boundary (see §7). |
+| `workspace-snapshots` | A1 | prior acceptance re-run at mid-build snapshots. |
+| `cumulative-union` | A2 | union of all prior sprints' acceptance runs at each sprint boundary (see §7). |
 
 A detected regression (a previously-passing weight-bearing check now failing)
 caps `REG` per the scenario's §7 and is recorded in telemetry
@@ -200,13 +200,13 @@ high-stakes comparisons.
 
 ---
 
-## 7. `score.json` (nested) + L7 per-sprint variant
+## 7. `score.json` (nested) + A2 per-sprint variant
 
-Standard scenarios (L0–L6, L8):
+Standard scenarios (L0–A1, A3):
 
 ```json
 {
-  "scenario": "L6-kanban-app",
+  "scenario": "A1-kanban-app",
   "strategy": "example-harness@v3",
   "gate": {"expression": "p0_pass == 1.0 and acceptance_pass >= 0.90",
            "p0_pass": 1.0, "acceptance_pass": 0.93, "perf_ok": null,
@@ -231,11 +231,11 @@ score the worst tag (`CONVERGENCE_METRICS §3`). `gaming_events` is a list of
 `{vector, consequence}` where `consequence ∈ {disqualify, cap-REG, cap-EFF,
 cap-FID, cap-QUA}`.
 
-**L7 variant** — per-sprint blocks + aggregation:
+**A2 variant** — per-sprint blocks + aggregation:
 
 ```json
 {
-  "scenario": "L7-kanban-sprints",
+  "scenario": "A2-kanban-sprints",
   "sprints": [
     {"id": 0, "gate": {"acceptance_pass": 1.0, "regression_pass": 1.0, "passed": true},
      "axes": {"COR": 4, "ROB": 3, "EFF": 3, "AUT": 4, "QUA": 3, "REG": 4, "FID": 3},
@@ -248,7 +248,7 @@ cap-FID, cap-QUA}`.
 }
 ```
 
-L7 rules: each sprint is gated (`acceptance_pass == 1.0 and regression_pass ==
+A2 rules: each sprint is gated (`acceptance_pass == 1.0 and regression_pass ==
 1.0`) and scored; scenario score = mean of sprint scores; **any sprint that breaks
 a prior sprint's acceptance caps scenario `REG ≤ 1` and demotes the band**
 (regression safety is the point of the rung); `frontier_sprint` = highest sprint
@@ -260,7 +260,7 @@ reached at/above threshold; unreached sprints are `null`, not 0.
 
 - **Determinism:** acceptance/adversarial suites control time/randomness/network
   (fake clock at L2; fixed seed + throwaway DB at L5; fixed host key + fixture
-  vault at L8). Non-deterministic assertions are forbidden from the gate unless
+  vault at A3). Non-deterministic assertions are forbidden from the gate unless
   `flaky-guard`.
 - **Flaky-guard:** `retry: flaky-guard:N` retries a check up to N times **only**
   for infrastructure faults; a genuine failure (e.g., L5 concurrency count
@@ -285,6 +285,6 @@ reached at/above threshold; unreached sprints are `null`, not 0.
 | L3 | 1800 | 10 / 25 | 200k |
 | L4 | 3600 | 14 / 35 | 350k |
 | L5 | 5400 | 18 / 45 | 500k |
-| L6 | 14400 | 30 / 80 | 1.5M |
-| L7 | 28800 (8h; ~1.5h/sprint) | 20/50 per sprint | 4M |
-| L8 | 28800 (tunable; multi-session) | 60 / 150 | 3M |
+| A1 | 14400 | 30 / 80 | 1.5M |
+| A2 | 28800 (8h; ~1.5h/sprint) | 20/50 per sprint | 4M |
+| A3 | 28800 (tunable; multi-session) | 60 / 150 | 3M |

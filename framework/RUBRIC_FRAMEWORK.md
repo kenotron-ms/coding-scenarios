@@ -50,7 +50,7 @@ being extended, autonomously, and cheaply?" Exact per-rung numbers live in each
 scenario; the trend:
 
 ```
-Axis   L0   L1   L2   L3   L4   L5   L6   L7   L8
+Axis   L0   L1   L2   L3   L4   L5   A1   A2   A3
 COR    70   55   45   35   30   28   22   15   20
 ROB    15   25   20   18   15   15   12   10   18
 EFF     5    5   12   12   14   14   15   20   12
@@ -62,12 +62,12 @@ TOTAL 100  100  100  100  100  100  100  100  100
 ```
 
 (REG is meaningful only once there is prior behavior to protect — from L3's
-multi-run acceptance, growing to dominate at L7. FID appears once there is a
-product/design surface. FID's weight dips at L7 because the sprint backlog, not
+multi-run acceptance, growing to dominate at A2. FID appears once there is a
+product/design surface. FID's weight dips at A2 because the sprint backlog, not
 a static design, carries acceptance — regression and autonomy dominate there.)
 
-**L8 extends the trajectory rather than continuing it.** L8 is a hand-curated
-capstone (see `scenarios/L8-markdown-editor`) that breaks the L7 shape: a native
+**A3 extends the trajectory rather than continuing it.** A3 is a hand-curated
+capstone (see `scenarios/A3-markdown-editor`) that breaks the A2 shape: a native
 desktop shell (Tauri), remote/secure I/O over SSH, and a hard cold-boot budget.
 `ROB` rises to 18 because robustness there **includes the security surface**
 (host-key verification, secret handling, sanitization); `FID` reaches its ladder
@@ -83,8 +83,8 @@ strategy cannot "score well" on non-working software. Typical floors:
 
 - L0–L2: **100%** of the acceptance suite (these are deterministic).
 - L3–L5: **≥ 95%** of acceptance assertions.
-- L6: **100%** of P0 acceptance criteria, **≥ 90%** overall.
-- L7: **100%** of the *current sprint's* acceptance criteria **and** **100%** of
+- A1: **100%** of P0 acceptance criteria, **≥ 90%** overall.
+- A2: **100%** of the *current sprint's* acceptance criteria **and** **100%** of
   the accumulated regression suite from prior sprints.
 
 `adversarial` results never count toward the gate (they are run once, post-hoc,
@@ -106,13 +106,13 @@ A scenario's **pass threshold** (each §7.4) is the score at/above which we call
 the rung "converged" for **ladder-profile** purposes.
 
 **On the hard rungs, "passing" legitimately lands in Converged-Rough.** By design
-the pass thresholds for L5–L8 (68/68/68/66) fall inside the Converged-Rough band
+the pass thresholds for L5–A3 (68/68/68/66) fall inside the Converged-Rough band
 (55–69), *below* the Converged floor (70). This is intentional, not an
 inconsistency: at those rungs — a live service, a full app, a five-sprint
 delivery, a native+SSH desktop app — merely reaching working, gate-clearing code
 is a real achievement, and the band label honestly reflects that getting there is
 usually costly and messy. A strategy that reaches **Converged** (≥70) or
-**Converged-Clean** (≥85) on L5–L8 is doing something exceptional. (The lower
+**Converged-Clean** (≥85) on L5–A3 is doing something exceptional. (The lower
 rungs L0–L4 keep thresholds at/above the Converged floor, where clean convergence
 is the reasonable expectation.)
 
@@ -128,8 +128,8 @@ L2  ████████░░ 82  Converged
 L3  ███████░░░ 74  Converged
 L4  ██████░░░░ 63  Converged-Rough
 L5  ████░░░░░░ 41  FAILED (gate) — could not keep concurrency-safe under load
-L6  —          not attempted (below-gate at L5)
-L7  —
+A1  —          not attempted (below-gate at L5)
+A2  —
 ```
 
 The **convergence frontier** — the highest rung the strategy reaches *at or

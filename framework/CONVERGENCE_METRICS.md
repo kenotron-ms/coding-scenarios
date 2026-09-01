@@ -60,7 +60,7 @@ Each scenario defines `iterations_soft`, `iterations_hard`, `wall_clock_s`, and 
 | 1 | Passed only at the hard cap; heavy thrash. |
 | 0 | Did not pass within budget (also a gate concern). |
 
-Budgets scale up the ladder (a fair L6 budget would be absurd for L0). Budgets
+Budgets scale up the ladder (a fair A1 budget would be absurd for L0). Budgets
 are defined per scenario §0 and mirrored in `manifest.yaml`.
 
 ## 5. Reporting
@@ -68,7 +68,7 @@ are defined per scenario §0 and mirrored in `manifest.yaml`.
 Every run emits the telemetry block inside `score.json` (see
 `VERIFICATION_CONTRACT.md §6`). Strategy comparisons aggregate telemetry across
 the ladder to show *shape*: e.g., a strategy whose `iterations` stay flat but
-`regressions_introduced` explodes at L7 has a clear, nameable weakness
+`regressions_introduced` explodes at A2 has a clear, nameable weakness
 (no regression discipline) even though it "passed" lower rungs.
 
 ## 6. Anti-gaming and integrity

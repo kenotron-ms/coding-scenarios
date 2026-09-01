@@ -1,12 +1,12 @@
-# L8 — Markdown Vault Editor (Tauri + SSH) — REQUIREMENTS
+# A3 — Markdown Vault Editor (Tauri + SSH) — REQUIREMENTS
 
 > Follows `framework/REQUIREMENTS_TEMPLATE.md`; scored per
 > `framework/RUBRIC_FRAMEWORK.md`; verified per `framework/VERIFICATION_CONTRACT.md`;
-> discovery/design obligations fixed by the **L8 row** of
+> discovery/design obligations fixed by the **A3 row** of
 > `framework/ARTIFACT_GRADIENT.md`.
 >
-> **Hand-curated capstone — extends the designed ladder.** L0–L7 form a
-> systematically-graded ladder; **L8 is a bespoke top rung** chosen because it
+> **Hand-curated capstone — extends the designed ladder.** L0–A2 form a
+> systematically-graded ladder; **A3 is a bespoke top rung** chosen because it
 > concentrates several *new* classes of difficulty that the web-app rungs never
 > touch: a **native desktop shell (Tauri)**, **remote and security-sensitive
 > I/O over SSH**, integration with **OS-level config (`~/.ssh/config`)**, a
@@ -17,8 +17,8 @@
 > weight profile, pass threshold) are flagged as tunable.
 
 ## 0. Scenario Summary
-- **Level:** L8
-- **Codename / dir:** `L8-markdown-editor`
+- **Level:** A3
+- **Codename / dir:** `A3-markdown-editor`
 - **One-liner:** A Tauri desktop app — a lightning-fast, WYSIWYM Markdown
   reader/editor that opens "vaults" of Markdown files **over SSH** (optionally
   via Tailscale), discovers hosts by reading the user's SSH config, remembers
@@ -27,7 +27,7 @@
   also read and write.
 - **New difficulty introduced:** First **native desktop application** that
   integrates with the **operating system** and **remote systems**. Distinct from
-  L6/L7 (a browser web app) along four axes at once: (1) a native shell
+  A1/A2 (a browser web app) along four axes at once: (1) a native shell
   (Tauri: Rust core + system webview, cross-platform packaging); (2) **remote,
   secure file I/O over SSH/SFTP** with real key/agent handling and host-key
   verification; (3) reading and honoring **system configuration**
@@ -36,7 +36,7 @@
   are load-bearing, not incidental.
 - **Estimated reference solution size:** 5,000–12,000 LoC across Rust
   (Tauri core/commands) + TypeScript (editor SPA); 60–120 files.
-- **Budgets (grading; the L8 row of `framework/GRADING.md §9`).** These are the
+- **Budgets (grading; the A3 row of `framework/GRADING.md §9`).** These are the
   scenario's `EFF` budgets — declared in `manifest.yaml` `budgets` and
   authoritative for scoring. Stated concretely here so `EFF` is computable:
   - **`wall_clock_s`: 28800** (8 h; multi-session — the rung stresses sustained
@@ -47,7 +47,7 @@
   `EFF` scores against these per `GRADING.md §3` / `CONVERGENCE_METRICS §4`;
   exceeding `wall_clock_s` or the hard iteration cap is terminal. (Values are
   tunable at the ladder level, but fixed here — they are the numbers a grader
-  reads for L8.)
+  reads for A3.)
 - **Intervention budget:** 0. `clarify`-type interventions on the deliberately-open
   transport/editor-engine ambiguities (§1.6) are low severity and do not, by
   themselves, cap Autonomy. Any `hint`/`rescue` on the SSH/security surface is a
@@ -292,15 +292,15 @@ gated. Priorities follow the FR/NFR tiering in §4.2. Per-assertion `weight`/cou
 - **AC-1 — P0** (FR-1/2/4): connect to the test `sshd`, list config hosts, browse the
   fixture vault, open a file — over real SSH.
 - **AC-2 — P0** (FR-6, NFR-3): Mermaid + fenced-code render correctly; **sanitized**
-  (the sanitization assertion is the `L8-SEC-sanitize` security `gate_authority`, §6.2).
+  (the sanitization assertion is the `A3-SEC-sanitize` security `gate_authority`, §6.2).
 - **AC-3 — P0** (FR-7/8, NFR-4): edit and save with a **minimal diff**; unedited bytes
   preserved.
 - **AC-4 — P0** (FR-3, NFR-3): unknown host key prompts (not auto-accepted); no secret is
-  found in app state/logs (the `L8-SEC-hostkey` + `L8-SEC-nosecrets` security
+  found in app state/logs (the `A3-SEC-hostkey` + `A3-SEC-nosecrets` security
   `gate_authority` checks, §6.2).
 - **AC-5 — P0** (FR-5): vaults + last session restore across restart; no secrets stored.
 - **AC-6 — P0** (NFR-1): cold-boot/first-render budgets met, measured on the packaged app
-  (the `L8-PERF-*` perf `gate_authority` checks, §6.2).
+  (the `A3-PERF-*` perf `gate_authority` checks, §6.2).
 - **AC-7 — P0** (NFR-5): full keyboard editing path + `axe` clean on main views. The
   keyboard-editing path is the P0 core; a11y polish beyond it is P1 (§4.2), scored
   under FID/QUA rather than gated.
@@ -311,7 +311,7 @@ gated. Priorities follow the FR/NFR tiering in §4.2. Per-assertion `weight`/cou
 AC-6, AC-7}; **P1** = {AC-8}. `p0_pass == 1.0` means every P0 criterion above passes.
 
 ## 5. Discovery & Design Activities
-Per `ARTIFACT_GRADIENT.md` row L8, the full product/design surface is **Required**,
+Per `ARTIFACT_GRADIENT.md` row A3, the full product/design surface is **Required**,
 **plus** two rung-specific artifacts (a **threat model** and a **performance
 budget spec**) that this security- and performance-critical app demands.
 - **5.1 User research** — Interviews with remote-first Markdown users and
@@ -361,30 +361,30 @@ budget spec**) that this security- and performance-critical app demands.
   p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok
   ```
 
-  Its named quantities for L8:
+  Its named quantities for A3:
   - **`p0_pass`** — weighted pass fraction of the **P0 acceptance set** (§4.4:
     AC-1…AC-7); must equal **1.0**.
   - **`acceptance_pass`** — weighted pass fraction of the whole acceptance suite;
     must be **≥ 0.90**.
   - **`perf_ok`** — **all perf `gate_authority` checks pass** (`axis∋EFF`). The
     named authorities, measured on the **real packaged app** (numbers from NFR-1):
-    - `L8-PERF-coldboot` — cold start to an interactive window **≤ 800 ms** (cold).
-    - `L8-PERF-warmboot` — warm-cache start to an interactive window **≤ 400 ms**.
-    - `L8-PERF-firstrender` — time-to-first-render of a fetched file **≤ 300 ms**
+    - `A3-PERF-coldboot` — cold start to an interactive window **≤ 800 ms** (cold).
+    - `A3-PERF-warmboot` — warm-cache start to an interactive window **≤ 400 ms**.
+    - `A3-PERF-firstrender` — time-to-first-render of a fetched file **≤ 300 ms**
       after bytes arrive.
   - **`security_ok`** — **all security `gate_authority` checks pass**. The named
     authorities (from FR-3 / NFR-3 / FR-5):
-    - `L8-SEC-hostkey` — host-key verification enforced; an unknown/changed key
+    - `A3-SEC-hostkey` — host-key verification enforced; an unknown/changed key
       **prompts and is never auto-accepted** (TOFU).
-    - `L8-SEC-nosecrets` — **no passwords/private keys persisted or logged**; app
+    - `A3-SEC-nosecrets` — **no passwords/private keys persisted or logged**; app
       state + logs inspected clean.
-    - `L8-SEC-sanitize` — Markdown→HTML and Mermaid input **sanitized**; embedded
+    - `A3-SEC-sanitize` — Markdown→HTML and Mermaid input **sanitized**; embedded
       `<script>` / `javascript:` / Mermaid injection cannot execute.
 
   Each `gate_authority` check can fail the gate **alone** (`GRADING.md §1/§4`).
-  The perf authorities are exercised by **AC-6**; `L8-SEC-hostkey` /
-  `L8-SEC-nosecrets` by **AC-4** (and the adversarial changed-key case in §6.1);
-  `L8-SEC-sanitize` by **AC-2** and the adversarial injection case. Security and
+  The perf authorities are exercised by **AC-6**; `A3-SEC-hostkey` /
+  `A3-SEC-nosecrets` by **AC-4** (and the adversarial changed-key case in §6.1);
+  `A3-SEC-sanitize` by **AC-2** and the adversarial injection case. Security and
   performance are non-negotiable at this rung — a beautiful editor that
   auto-accepts host keys or stores a password **fails outright**.
 - **6.3 Verification mechanics** — `desktop-app` kind: the harness builds/packages
@@ -399,7 +399,7 @@ budget spec**) that this security- and performance-critical app demands.
   security gate. Reading held-out suites, weakening the test `sshd`'s host-key
   policy, or escaping the workspace is a `gaming_event` → disqualification.
 - **6.5 Regression strategy (declared) — `workspace-snapshots`** (`GRADING.md §5`;
-  `regression.strategy: workspace-snapshots` in `manifest.yaml`). L8's `REG` axis
+  `regression.strategy: workspace-snapshots` in `manifest.yaml`). A3's `REG` axis
   is computed by **re-running the prior `acceptance` suite at mid-build workspace
   snapshots**: at each snapshot, every previously-passing weight-bearing
   acceptance check must still pass. A previously-passing check that later fails is
@@ -407,18 +407,18 @@ budget spec**) that this security- and performance-critical app demands.
   (`regressions_introduced`, `oscillations`). Snapshots are taken at natural build
   milestones (e.g., SSH transport stabilized; document-model/serializer round-trip
   proven; render pipeline landed; vault memory + session restore landed). This
-  fixes L8's `regression_pass` denominator and makes the `REG` axis well-defined
-  (single ambitious build, not L7's per-sprint `cumulative-union`).
+  fixes A3's `regression_pass` denominator and makes the `REG` axis well-defined
+  (single ambitious build, not A2's per-sprint `cumulative-union`).
 
 ## 7. Scoring Rubric
 - **7.1 Weight profile** (sum 100; **extends** `RUBRIC_FRAMEWORK.md §3`):
   `COR 20 · ROB 18 · EFF 12 · AUT 12 · QUA 13 · REG 10 · FID 15`.
-  Rationale: L8 breaks the L7 trend rather than continuing it. `ROB` climbs to 18
+  Rationale: A3 breaks the A2 trend rather than continuing it. `ROB` climbs to 18
   because robustness here **includes the security surface** (SSH trust, host-key
   policy, secret handling, sanitization) and hostile network conditions. `FID`
   reaches the ladder **maximum of 15** because the WYSIWYM editing experience and
   the "lightning-fast" perceived performance *are* the product. `REG` is 10 —
-  lower than L7 (this is a single ambitious build, not a five-sprint sequence)
+  lower than A2 (this is a single ambitious build, not a five-sprint sequence)
   but non-trivial given the many interacting features. `COR`/`EFF`/`AUT`/`QUA`
   stay meaningful for a large native+web codebase.
 - **7.2 Per-axis scoring guide**
@@ -434,12 +434,12 @@ budget spec**) that this security- and performance-critical app demands.
 - **7.3 Hard gate** — the §6.2 expression
   `p0_pass == 1.0 and acceptance_pass >= 0.90 and perf_ok and security_ok`
   (`GRADING.md §4`): **100% of the P0 acceptance set (§4.4) AND ≥ 90% overall AND
-  all perf `gate_authority` checks (`L8-PERF-coldboot/-warmboot/-firstrender`)
-  AND all security `gate_authority` checks (`L8-SEC-hostkey/-nosecrets/-sanitize`)**.
+  all perf `gate_authority` checks (`A3-PERF-coldboot/-warmboot/-firstrender`)
+  AND all security `gate_authority` checks (`A3-SEC-hostkey/-nosecrets/-sanitize`)**.
   Failing perf **or** security fails the run regardless of feature completeness.
   Gate false ⇒ run scored **Failed (0 overall)** (`RUBRIC_FRAMEWORK.md §4`).
-- **7.4 Pass threshold** — **66** (Converged). Slightly below L7's 68, reflecting
-  the harder, more open, security-and-perf-gated surface — clearing L8 at 66+
+- **7.4 Pass threshold** — **66** (Converged). Slightly below A2's 68, reflecting
+  the harder, more open, security-and-perf-gated surface — clearing A3 at 66+
   indicates a strategy that converges on native, remote, security-sensitive,
   UX-defining software.
 

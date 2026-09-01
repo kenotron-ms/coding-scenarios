@@ -454,7 +454,7 @@ surface and required user stories, but no personas, backlog, or visual design.
     demonstrably changes a design decision (e.g. justifying the JSON schema
     shape), not as a written-after-the-fact narrative.
   - Personas — **N/A** — the operator profiles in §1.2 fully cover the two usage
-    contexts; formal personas begin at L6 where end-user experience is part of
+    contexts; formal personas begin at A1 where end-user experience is part of
     "working."
   - Usability testing — **N/A** — no interactive UI to observe.
 - **5.2 Product design**
@@ -531,7 +531,7 @@ surface and required user stories, but no personas, backlog, or visual design.
     `| head -1` (no traceback).
 - **6.2 "Working" definition** — **≥ 95% of acceptance assertions pass.** There is
   no separate must-pass P0 subset at this rung (that carve-out is introduced at
-  L6); the 5% headroom exists because the acceptance matrix is large and a single
+  A1); the 5% headroom exists because the acceptance matrix is large and a single
   cosmetic text-layout assertion should not be fatal. Adversarial results never
   count toward the gate but feed `COR`/`ROB`.
 - **6.3 Verification mechanics** — Every tier runs the **real path**: the built
